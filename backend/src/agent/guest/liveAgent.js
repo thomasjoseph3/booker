@@ -4,10 +4,10 @@ import { config } from '../../config.js';
 import * as hotels from '../../modules/hotels/repository.js';
 import { normalizePhone } from '../../utils/misc.js';
 import { appendTranscript, finishCall, logCallError, openCallLog } from './callRecord.js';
+import { geminiDeclarations } from '../shared/schema.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
-import { geminiFunctionDeclarations } from './tools.js';
-import { runTool } from './toolRunner.js';
+import { buildGuestTools, invokeGuestTool } from './toolRunner.js';
 
 /**
  * Real-time voice calls for the public website.
@@ -63,6 +63,7 @@ async function handleCall(client, req) {
   const session = createSession({ callerPhone, callerEmail: /^\S+@\S+\.\S+$/.test(callerEmail) ? callerEmail : undefined });
   await openCallLog(hotel, { callId, callerPhone, note: 'Website call', channel: 'web_live', model: config.gemini.liveModel });
 
+  const guestTools = buildGuestTools({ session, hotel, callId });
   const upstream = new WebSocket(`${GEMINI_WS}?key=${config.gemini.apiKey}`);
   let ready = false;
   let ended = false;
@@ -109,7 +110,7 @@ async function handleCall(client, req) {
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
           },
           systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
-          tools: [{ functionDeclarations: geminiFunctionDeclarations }],
+          tools: [{ functionDeclarations: geminiDeclarations(guestTools) }],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
@@ -149,7 +150,7 @@ async function handleCall(client, req) {
       const functionResponses = [];
       for (const fc of m.toolCall.functionCalls) {
         await flush(); // keep the transcript in spoken order: what was said before the tool ran comes first
-        const result = await runTool(session, hotel, callId, fc.name, fc.args || {});
+        const result = await invokeGuestTool(guestTools, fc.name, fc.args);
         send(client, { type: 'tool', name: fc.name, ok: !result.error });
         functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
       }

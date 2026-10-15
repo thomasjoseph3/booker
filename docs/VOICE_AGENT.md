@@ -25,7 +25,7 @@ existed and is reused unchanged.
 | Server WebSocket | **`ws`** npm package | Standard Node WebSocket server and client. |
 | Tool calling | Gemini function calling, tool schemas in `backend/src/agent/tools.js` | The model decides when to check availability or book; the backend executes it against the real API. |
 | Guest messages | **Nodemailer over SMTP** (Gmail app password for now) | WhatsApp setup was pending; email works immediately. `GUEST_CHANNELS` selects email, WhatsApp or both. |
-| Summaries and the staff assistant | Gemini REST `generateContent` | End-of-call summaries and the admin assistant (text, with tools). |
+| Tools, staff assistant, summaries | **LangChain** (`langchain`, `@langchain/core`, `@langchain/google-genai`) | One zod schema per tool; the staff assistant is a `createAgent` agent; summaries use structured output. The live audio path stays native (see ARCHITECTURE.md, "Where LangChain stops"). |
 
 Not used (yet): LiveKit, Pipecat, Deepgram, ElevenLabs, a telephony provider. They are possible upgrades (section 8).
 
@@ -94,10 +94,10 @@ Binary frames are audio. Text frames are JSON events.
 | `backend/src/agent/liveAgent.js` | WebSocket server, Gemini Live relay, tool execution, transcript logging |
 | `backend/src/agent/prompt.js` | System prompt: persona, speaking style, booking rules, property facts |
 | `backend/src/agent/tools.js` | Tool definitions (name, description, JSON schema, which HTTP endpoint implements it) |
-| `backend/src/agent/toolRunner.js` | Turns a model tool call into a call to the agent API |
+| `backend/src/agent/toolRunner.js` | LangChain tools for one call: each runs the agent API request and logs it |
 | `backend/src/agent/routes.js` | The booking API the agent uses as tools (`/api/agent/*`) |
 | `backend/src/agent/callRecord.js` | Call log: open, append transcript, close with outcome and summary |
-| `backend/src/agent/shared/gemini.js` | Gemini text client (call summaries and the staff assistant) |
+| `backend/src/agent/shared/model.js`, `schema.js` | LangChain chat models with fallbacks; zod to provider JSON schema |
 | `backend/src/agent/staff/` | The separate, read-only staff assistant (see ARCHITECTURE.md) |
 | `backend/src/modules/notifications/` | Guest messages by email and/or WhatsApp |
 | `backend/src/modules/public/` | Unauthenticated property info for the website |

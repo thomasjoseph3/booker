@@ -21,7 +21,10 @@ export const config = {
     maxLiveCalls: Number(process.env.MAX_LIVE_CALLS || 5),
     maxLiveMinutes: Number(process.env.MAX_LIVE_MINUTES || 10),
     // Tried in order; later ones are used when an earlier one is rate limited
-    models: [process.env.GEMINI_MODEL || 'gemini-2.5-flash', ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash-lite').split(',')]
+    models: [
+      process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash-lite,gemini-3.1-flash-lite').split(','),
+    ]
       .map((m) => m.trim())
       .filter(Boolean),
   },

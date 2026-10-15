@@ -60,35 +60,55 @@ without business rules (for example `notifications`) have no service.
 
 ## The agents
 
-There are two AI agents with different users, permissions and tools, under `src/agent/` (entry point: `agent/index.js`):
+There are two AI agents with different users, permissions and tools, under `src/agent/` (entry point: `agent/index.js`).
+They are built on **LangChain**: tools are LangChain tools with zod schemas, the staff assistant is a LangChain agent
+(`createAgent`) with middleware, and call summaries use LangChain structured output.
 
 ```
 agent/
   guest/    The receptionist guests talk to (website call, later phone). Books and manages the caller's own bookings.
   staff/    The assistant for signed-in hotel staff. Read-only answers about analytics, availability, bookings, ...
-  shared/   gemini.js, the Gemini text client (with rate-limit fallback between models)
+  shared/   model.js (LangChain chat models and fallbacks), schema.js (zod to provider JSON schema), language.js (language rules)
 ```
 
 | Guest agent (`guest/`) | Purpose |
 |---|---|
-| `liveAgent.js` | Real-time audio calls: WebSocket server bridging the browser and Gemini Live |
+| `liveAgent.js` | Real-time audio calls: WebSocket server bridging the browser and Gemini Live (see "Where LangChain stops" below) |
+| `tools.js` | The tool specs (zod schema + which `/api/agent` endpoint implements each). Single source of truth |
+| `toolRunner.js` | `buildGuestTools`: LangChain tools bound to one call; fills in caller phone/email; logs every call with args, result and timing |
 | `prompt.js` | Persona, speaking style and booking rules. Tune the receptionist here |
-| `tools.js`, `toolRunner.js` | What the agent may do, and execution of a tool call (logged with args, result and timing) |
-| `routes.js`, `auth.js` | The HTTP API the agent uses as its tools (`/api/agent/*`), authenticated by API key |
-| `callRecord.js`, `session.js` | Call log (transcript, outcome, summary, errors) and per-call state |
+| `routes.js`, `auth.js` | The HTTP API the agent uses as its tools (`/api/agent/*`), authenticated by API key. `GET /api/agent/tools` serves the same specs to external agent runtimes |
+| `callRecord.js`, `session.js` | Call log (transcript, outcome, grounded summary via structured output, language, errors) and per-call state |
 | `views.js` | Agent-friendly shapes of bookings and property facts |
 
 | Staff assistant (`staff/`) | Purpose |
 |---|---|
-| `assistant.js` | Chat loop: model + tools, stores every exchange with the tool calls behind it |
-| `tools.js` | 15 read-only lookups (overview, analytics, availability, bookings, rooms, payments, callbacks, calls, guests, property info), scoped to the user's property |
+| `assistant.js` | `runAssistant`: a LangChain agent with model fallbacks and a cap on tool rounds; `sendMessage` stores every exchange with the tool calls behind it |
+| `tools.js` | 15 read-only tool specs (zod), built per conversation by `buildStaffTools(ctx, trace)` so each is bound to the user and property |
 | `prompt.js`, `views.js` | Persona/rules, and compact shapes of data for the model |
 | `routes.js` | `/api/admin/hotels/:hotelId/assistant/*`, any signed-in staff member, rate limited per user |
 
 Rules for both agents: they change or read hotel data only through the same services and APIs the dashboard uses, never
 through the database directly; tool failures come back as `{ error }` so the model can explain them; and everything they
 do is recorded (guest calls in the call log, staff chats in `modules/conversations`) for history and debugging.
-See [VOICE_AGENT.md](VOICE_AGENT.md) for how the real-time call works.
+
+### How LangChain is used
+
+- **Tools:** one zod schema per tool drives validation, the public tool list and the Gemini declarations (`shared/schema.js`
+  strips what providers reject). Tools are built per call or conversation, so they carry their own context.
+- **Model layer:** `shared/model.js` is the only file that knows the provider (Gemini via `@langchain/google-genai`). A primary
+  model plus fallbacks (`GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`) handle the small free-tier quotas; switching provider is a change there.
+- **Staff assistant:** `createAgent` with `modelFallbackMiddleware` and `modelCallLimitMiddleware`. The stored conversation is the source
+  of truth for context, so chats survive restarts and work across several server instances.
+- **Summaries:** `model.withStructuredOutput(zod schema)`, grounded in the tool log so a summary never claims a booking that was not made.
+- **Tests:** LangChain's `fakeModel` scripts the model, so the whole agent loop (tool calls, fallbacks, loop caps) is unit tested offline.
+
+### Where LangChain stops
+
+The live voice call streams audio both ways over a WebSocket to **Gemini Live**; the model, not our code, runs the conversation
+loop, and LangChain's chat abstractions do not cover that realtime audio protocol. So `liveAgent.js` stays a thin native bridge,
+but it still uses the LangChain tools (declarations are generated from them and every tool call executes through them).
+If a text channel is added for guests (for example a WhatsApp bot), it can reuse the same guest tools with `createAgent`.
 
 ## Adding a feature
 

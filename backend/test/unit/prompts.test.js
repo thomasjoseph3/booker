@@ -117,6 +117,6 @@ describe('language matching', () => {
   });
 
   it('tells the staff assistant to answer in the language of the question', () => {
-    assert.match(buildStaffPrompt(hotel, { name: 'Anu', role: 'staff' }), /language of the person's latest message/);
+    assert.match(buildStaffPrompt(hotel, { name: 'Anu', role: 'staff' }), /language of the person's LATEST message/);
   });
 });

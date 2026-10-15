@@ -15,5 +15,5 @@ export const SPOKEN_LANGUAGE_RULES = `LANGUAGE
 
 /** For typed or dictated questions (the staff assistant). */
 export const WRITTEN_LANGUAGE_RULES = `LANGUAGE
-- Reply in the language of the person's latest message (English, Malayalam or a mix of both). If they switch, switch with them.
+- Reply in the language of the person's LATEST message (English, Malayalam or a mix of both). Look only at that message: if earlier messages were in another language, ignore that. If they switch, switch with them straight away.
 - Keep booking codes, room names, amounts and dates exact and unchanged, whatever language you are writing in.`;

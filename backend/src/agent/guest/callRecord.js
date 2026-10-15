@@ -1,6 +1,7 @@
 import * as bookings from '../../modules/bookings/repository.js';
 import * as calls from '../../modules/calls/repository.js';
-import { generateContent } from '../shared/gemini.js';
+import { z } from 'zod';
+import { createModels } from '../shared/model.js';
 
 /**
  * Everything that writes the CallLog for an AI call (shown in the admin under "Agent calls"):
@@ -15,16 +16,12 @@ const OUTCOME_BY_TOOL = [
   ['request_human_callback', 'callback_requested'],
 ];
 
-const SUMMARY_SCHEMA = {
-  type: 'object',
-  properties: {
-    summary: { type: 'string', description: 'One or two sentences' },
-    intent: { type: 'string', description: 'Short label, e.g. new booking, cancellation, room enquiry' },
-    sentiment: { type: 'string', enum: ['positive', 'neutral', 'negative'] },
-    language: { type: 'string', description: 'Main language the caller spoke: English, Malayalam, Hindi, ... or Mixed' },
-  },
-  required: ['summary', 'intent', 'sentiment', 'language'],
-};
+const SummarySchema = z.object({
+  summary: z.string().describe('One or two sentences, in English'),
+  intent: z.string().describe('Short label in English, e.g. new booking, cancellation, room enquiry'),
+  sentiment: z.enum(['positive', 'neutral', 'negative']),
+  language: z.string().describe('Main language the caller spoke: English, Malayalam, Hindi, ... or Mixed'),
+});
 
 /** Creates the call record when a call connects. */
 export function openCallLog(hotel, { callId, callerPhone, note, greeting, channel, model }) {
@@ -59,35 +56,28 @@ export function logCallError(hotelId, callId, message, detail) {
   return appendTranscript(hotelId, callId, [{ role: 'system', text: `⚠ ${message}`, data: { error: message, ...detail } }]).catch(() => {});
 }
 
-/** Asks Gemini for a short summary, intent and sentiment. Returns {} if that is not possible. */
-async function summarize(transcript) {
-  const text = transcript
-    .filter((t) => t.role !== 'tool')
-    .map((t) => `${t.role}: ${t.text}`)
-    .join('\n');
+/** Asks the model for a short summary, intent, sentiment and language. Returns {} if that is not possible. */
+async function summarize(transcript, makeModels = () => createModels({ temperature: 0, maxOutputTokens: 400 })) {
+  // Tool lines are included so the summary can only state what really happened (a booking exists only if create_booking succeeded).
+  const text = transcript.map((t) => (t.role === 'tool' ? `[tool] ${t.text}` : `${t.role}: ${t.text}`)).join('\n');
   try {
-    const data = await generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `Summarise this hotel phone call. Write the summary and intent in English even if the call was in another language, and report the language the caller spoke.\n\n${text}`,
-            },
-          ],
-        },
-      ],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: SUMMARY_SCHEMA },
-    });
-    const result = JSON.parse(data.candidates[0].content.parts[0].text);
+    const models = makeModels();
+    const structured = (model) => model.withStructuredOutput(SummarySchema);
+    const model = structured(models.primary).withFallbacks(models.fallbacks.map(structured));
+    const result = await model.invoke(
+      'Summarise this hotel phone call. Write the summary and intent in English even if the call was in another language, and report the language the caller spoke. ' +
+        'Only state what the transcript and the [tool] lines show: say a booking was made or a payment link sent only if a create_booking tool succeeded, and say what was still pending otherwise.' +
+        `\n\n${text}`,
+    );
     // snake_case like the rest of the data (the admin turns underscores into spaces for display)
-    if (result.intent)
-      result.intent = result.intent
+    return {
+      ...result,
+      intent: result.intent
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_|_$/g, '');
-    return result;
+        .replace(/^_|_$/g, ''),
+    };
   } catch (e) {
     console.error(`[agent] call summary failed: ${e.message}`);
     return {};

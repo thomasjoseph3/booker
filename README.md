@@ -162,7 +162,7 @@ backend/
     routes/admin.js                         Composes the admin API
     modules/                                One folder per feature: routes.js -> service.js -> repository.js
       auth hotels rooms inventory bookings payments guests calls conversations notifications analytics public
-    agent/                                  guest/ (the receptionist), staff/ (the dashboard assistant), shared/
+    agent/                                  guest/ (the receptionist), staff/ (the dashboard assistant), shared/ — built on LangChain
     models/                                 Mongoose schemas
     middleware/ utils/ validation.js        Shared plumbing
   scripts/seed.js, today-snapshot.js        Demo property and today's guests

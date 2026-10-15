@@ -1,4 +1,5 @@
-import { hotelProfileForAgent } from '../guest/views.js';
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
 import { analytics, dashboard } from '../../modules/analytics/service.js';
 import { searchAvailability } from '../../modules/bookings/availability.js';
 import { bookingDetail, searchBookings } from '../../modules/bookings/service.js';
@@ -8,27 +9,31 @@ import { inventoryGrid } from '../../modules/inventory/service.js';
 import { listPayments } from '../../modules/payments/service.js';
 import { listRoomsWithStays, listRoomTypes } from '../../modules/rooms/service.js';
 import { addDays, todayIn } from '../../utils/dates.js';
+import { hotelProfileForAgent } from '../guest/views.js';
 import { bookingBrief, callBrief, callbackBrief, guestBrief, paymentBrief, roomBrief } from './views.js';
 
 /**
  * What the staff assistant can look up. All tools are read-only and work on the signed-in user's property
- * (`ctx.hotel`), through the same services the dashboard uses. Each tool returns compact JSON.
+ * (`ctx.hotel`), through the same services the dashboard uses. Each returns compact JSON.
+ *
+ * A spec is `{ name, description, schema (zod), run(ctx, args) }`. `buildStaffTools` turns the specs into LangChain
+ * tools bound to one conversation; `runStaffTool` runs a spec directly (used by the tests).
  */
 
 const MAX_ROWS = 25;
 const rows = (n) => Math.min(Math.max(Number(n) || 10, 1), MAX_ROWS);
 const page = (n) => ({ page: 1, limit: rows(n) });
-const day = (what) => ({ type: 'string', description: `${what}, YYYY-MM-DD` });
+const day = (what) => z.string().describe(`${what}, YYYY-MM-DD`);
+const limit = z.coerce.number().int().optional().describe(`Max rows, up to ${MAX_ROWS}`);
 const BOOKING_STATUSES = 'pending_payment, confirmed, checked_in, checked_out, cancelled, expired, no_show';
 
-const tool = (name, description, properties, required, run) => ({ name, description, properties, required, run });
+const spec = (name, description, schema, run) => ({ name, description, schema, run });
 
-export const staffTools = [
-  tool(
+export const staffToolSpecs = [
+  spec(
     'get_overview',
     "Today's snapshot: arrivals, departures, guests in house, bookings awaiting payment, open callbacks, calls today, occupancy for the next 14 days, 30-day revenue and room status.",
-    {},
-    [],
+    z.object({}),
     async ({ hotel }) => {
       const d = await dashboard(hotel);
       return {
@@ -46,27 +51,25 @@ export const staffTools = [
       };
     },
   ),
-  tool(
+  spec(
     'get_analytics',
-    'Performance over the last N days: agent calls (outcomes, conversion, busy hours, sentiment, top intents), agent bookings and payment conversion, revenue by channel and room type, average daily rate, repeat guests, average occupancy.',
-    { days: { type: 'integer', description: 'Window in days, 1-90 (default 30)' } },
-    [],
+    'Performance over the last N days: agent calls (outcomes, conversion, busy hours, sentiment, languages, top intents), agent bookings and payment conversion, revenue by channel and room type, average daily rate, repeat guests, average occupancy.',
+    z.object({ days: z.coerce.number().int().optional().describe('Window in days, 1-90 (default 30)') }),
     async ({ hotel }, { days }) => {
       const a = await analytics(hotel, Math.min(Math.max(Number(days) || 30, 1), 90));
       return { ...a, occupancy: { averagePercent: a.occupancy.averagePercent } }; // the per-day occupancy series is long; the average answers most questions
     },
   ),
-  tool(
+  spec(
     'check_availability',
     'Which room types can take a party on given dates, how many rooms are free, and the price including tax and the advance due.',
-    {
+    z.object({
       checkIn: day('Check-in'),
       checkOut: day('Check-out'),
-      adults: { type: 'integer' },
-      children: { type: 'integer' },
-      rooms: { type: 'integer', description: 'Number of rooms (default 1)' },
-    },
-    ['checkIn', 'checkOut'],
+      adults: z.coerce.number().int().optional(),
+      children: z.coerce.number().int().optional(),
+      rooms: z.coerce.number().int().optional().describe('Number of rooms (default 1)'),
+    }),
     async ({ hotel }, a) => {
       const r = await searchAvailability(hotel, {
         checkIn: a.checkIn,
@@ -92,40 +95,34 @@ export const staffTools = [
       };
     },
   ),
-  tool(
+  spec(
     'get_inventory',
     'Day-by-day rooms sold, available and stop-sold per room type for a date range (max 31 days).',
-    { from: day('First night'), to: day('Last night') },
-    ['from', 'to'],
-    async ({ hotel }, { from, to }) => {
-      const limited = to > addDays(from, 30) ? addDays(from, 30) : to;
-      return inventoryGrid(hotel, { from, to: limited });
-    },
+    z.object({ from: day('First night'), to: day('Last night') }),
+    async ({ hotel }, { from, to }) => inventoryGrid(hotel, { from, to: to > addDays(from, 30) ? addDays(from, 30) : to }),
   ),
-  tool(
+  spec(
     'list_bookings',
     `Find bookings. Filters: status (comma separated of ${BOOKING_STATUSES}), view (arrivals, departures or in_house, for a given date), a stay date range, source (phone_agent, website, admin, walk_in), or free text (code, guest name, phone, email).`,
-    {
-      status: { type: 'string' },
-      view: { type: 'string', enum: ['arrivals', 'departures', 'in_house'] },
-      date: day('Date for the view (default today)'),
-      from: day('Stays overlapping from'),
-      to: day('Stays overlapping to'),
-      source: { type: 'string' },
-      query: { type: 'string', description: 'Booking code, guest name, phone or email' },
-      limit: { type: 'integer', description: `Max ${MAX_ROWS}` },
-    },
-    [],
+    z.object({
+      status: z.string().optional(),
+      view: z.enum(['arrivals', 'departures', 'in_house']).optional(),
+      date: day('Date for the view (default today)').optional(),
+      from: day('Stays overlapping from').optional(),
+      to: day('Stays overlapping to').optional(),
+      source: z.string().optional(),
+      query: z.string().optional().describe('Booking code, guest name, phone or email'),
+      limit,
+    }),
     async ({ hotel }, a) => {
       const result = await searchBookings(hotel, { ...a, q: a.query, ...page(a.limit) });
       return { total: result.total, showing: result.items.length, bookings: result.items.map(bookingBrief) };
     },
   ),
-  tool(
+  spec(
     'get_booking',
     'Everything about one booking: stay, guest, payments, messages sent, calls, cancellation terms and the latest history.',
-    { code: { type: 'string', description: 'Booking code, e.g. BK7F3K9Q' } },
-    ['code'],
+    z.object({ code: z.string().describe('Booking code, e.g. BK7F3K9Q') }),
     async ({ hotel }, { code }) => {
       const d = await bookingDetail(hotel, code);
       const b = d.booking.toObject();
@@ -153,7 +150,7 @@ export const staffTools = [
       };
     },
   ),
-  tool('list_room_types', 'Room types with price, capacity and how many rooms of each exist.', {}, [], async ({ hotel }) => {
+  spec('list_room_types', 'Room types with price, capacity and how many rooms of each exist.', z.object({}), async ({ hotel }) => {
     const types = await listRoomTypes(hotel);
     return types.map((t) => ({
       name: t.name,
@@ -167,80 +164,72 @@ export const staffTools = [
       bedType: t.bedType,
     }));
   }),
-  tool(
+  spec(
     'list_rooms',
     'Physical rooms with their status (available, occupied, cleaning, out_of_service) and the guest currently in them.',
-    { status: { type: 'string', enum: ['available', 'occupied', 'cleaning', 'out_of_service'] } },
-    [],
+    z.object({ status: z.enum(['available', 'occupied', 'cleaning', 'out_of_service']).optional() }),
     async ({ hotel }, { status }) => (await listRoomsWithStays(hotel, { status })).map(roomBrief),
   ),
-  tool(
+  spec(
     'list_callbacks',
     'The queue of tasks for staff: agent hand-offs, failed refunds, undeliverable messages.',
-    {
-      status: { type: 'string', description: 'open, in_progress or done; comma separated (default open and in_progress)' },
-      limit: { type: 'integer' },
-    },
-    [],
-    async ({ hotel }, { status, limit }) => {
-      const r = await listCallbacks(hotel._id, { status: status || 'open,in_progress' }, page(limit));
+    z.object({
+      status: z.string().optional().describe('open, in_progress or done; comma separated (default open and in_progress)'),
+      limit,
+    }),
+    async ({ hotel }, { status, limit: n }) => {
+      const r = await listCallbacks(hotel._id, { status: status || 'open,in_progress' }, page(n));
       return { total: r.total, callbacks: r.items.map(callbackBrief) };
     },
   ),
-  tool(
+  spec(
     'list_calls',
-    'Recent calls handled by the guest-facing AI agent, with outcome and summary.',
-    {
-      outcome: { type: 'string', enum: ['booked', 'cancelled', 'modified', 'inquiry', 'callback_requested', 'abandoned', 'other'] },
-      limit: { type: 'integer' },
-    },
-    [],
-    async ({ hotel }, { outcome, limit }) => {
-      const r = await listCalls(hotel._id, { outcome }, page(limit));
+    'Recent calls handled by the guest-facing AI agent, with outcome, language and summary.',
+    z.object({
+      outcome: z.enum(['booked', 'cancelled', 'modified', 'inquiry', 'callback_requested', 'abandoned', 'other']).optional(),
+      limit,
+    }),
+    async ({ hotel }, { outcome, limit: n }) => {
+      const r = await listCalls(hotel._id, { outcome }, page(n));
       return { total: r.total, calls: r.items.map(callBrief) };
     },
   ),
-  tool(
+  spec(
     'get_call',
     'One AI call in detail: summary plus the conversation and the tools the agent used (useful to see what went wrong).',
-    { id: { type: 'string', description: 'Call id from list_calls' } },
-    ['id'],
+    z.object({ id: z.string().describe('Call id from list_calls') }),
     async ({ hotel }, { id }) => {
       const call = await findCall(hotel._id, id);
       if (!call) return { error: 'Call not found' };
-      const lines = call.transcript.map((t) => `${t.role}: ${t.text}`);
-      return { ...callBrief(call), model: call.model, conversation: lines.slice(-60) };
+      return { ...callBrief(call), model: call.model, conversation: call.transcript.map((t) => `${t.role}: ${t.text}`).slice(-60) };
     },
   ),
-  tool(
+  spec(
     'list_payments',
     'Payments and refunds, newest first. Useful for pending refunds (status refund_pending) or unpaid links (status created).',
-    {
-      status: { type: 'string', description: 'created, paid, expired, cancelled, failed, refund_pending, refunded; comma separated' },
-      kind: { type: 'string', enum: ['charge', 'refund'] },
-      limit: { type: 'integer' },
-    },
-    [],
-    async ({ hotel }, { status, kind, limit }) => {
-      const r = await listPayments(hotel._id, { status, kind }, page(limit));
+    z.object({
+      status: z.string().optional().describe('created, paid, expired, cancelled, failed, refund_pending, refunded; comma separated'),
+      kind: z.enum(['charge', 'refund']).optional(),
+      limit,
+    }),
+    async ({ hotel }, { status, kind, limit: n }) => {
+      const r = await listPayments(hotel._id, { status, kind }, page(n));
       return { total: r.total, payments: r.items.map(paymentBrief) };
     },
   ),
-  tool(
+  spec(
     'search_guests',
     'Find guests by name, phone or email, with their booking count and lifetime spend.',
-    { query: { type: 'string' }, limit: { type: 'integer' } },
-    [],
-    async ({ hotel }, { query, limit }) => {
-      const r = await listGuests(hotel, query, page(limit));
+    z.object({ query: z.string().optional(), limit }),
+    async ({ hotel }, { query, limit: n }) => {
+      const r = await listGuests(hotel, query, page(n));
       return { total: r.total, guests: r.items.map(guestBrief) };
     },
   ),
-  tool(
+  spec(
     'get_guest',
     "One guest's profile with their bookings and calls.",
-    { id: { type: 'string', description: 'Guest id from search_guests' } },
-    ['id'],
+    z.object({ id: z.string().describe('Guest id from search_guests') }),
     async ({ hotel }, { id }) => {
       const g = await guestProfile(hotel, id);
       return {
@@ -250,31 +239,59 @@ export const staffTools = [
       };
     },
   ),
-  tool(
+  spec(
     'get_property_info',
     "The property's facts and policies: address, times, amenities, payment, cancellation and FAQs.",
-    {},
-    [],
-    async ({ hotel }) => ({ ...hotelProfileForAgent(hotel), todayAtProperty: todayIn(hotel.timezone) }),
+    z.object({}),
+    async ({ hotel }) => ({
+      ...hotelProfileForAgent(hotel),
+      todayAtProperty: todayIn(hotel.timezone),
+    }),
   ),
 ];
 
-const byName = new Map(staffTools.map((t) => [t.name, t]));
+const MAX_LOGGED_RESULT = 2000;
 
-/** Gemini `functionDeclarations` for the staff tools. */
-export const staffFunctionDeclarations = staffTools.map((t) => ({
-  name: t.name,
-  description: t.description,
-  ...(Object.keys(t.properties).length ? { parameters: { type: 'object', properties: t.properties, required: t.required } } : {}),
-}));
-
-/** Runs one tool for a hotel and user. Never throws: errors come back as `{ error }` so the model can explain or retry. */
-export async function runStaffTool(ctx, name, args = {}) {
-  const found = byName.get(name);
-  if (!found) return { error: `Unknown tool ${name}` };
+/** Runs one tool spec. Never throws: errors come back as `{ error }` so the model can explain or retry. */
+async function execute(s, ctx, args) {
   try {
-    return await found.run(ctx, args);
+    return await s.run(ctx, args);
   } catch (e) {
     return { error: e.message, details: e.details };
   }
+}
+
+/**
+ * LangChain tools bound to one conversation: they act for `ctx.hotel` and `ctx.user`, and push every call
+ * (arguments, outcome, time, truncated result) onto `trace` for the conversation history.
+ */
+export function buildStaffTools(ctx, trace, specs = staffToolSpecs) {
+  return specs.map((s) =>
+    tool(
+      async (args) => {
+        const started = Date.now();
+        const result = await execute(s, ctx, args);
+        const text = JSON.stringify(result);
+        trace.push({
+          name: s.name,
+          args,
+          ok: !result.error,
+          ms: Date.now() - started,
+          error: result.error,
+          result: text.slice(0, MAX_LOGGED_RESULT),
+        });
+        return text;
+      },
+      { name: s.name, description: s.description, schema: s.schema },
+    ),
+  );
+}
+
+/** Runs a tool by name with schema validation, without a model (used by the tests). */
+export async function runStaffTool(ctx, name, args = {}) {
+  const found = staffToolSpecs.find((s) => s.name === name);
+  if (!found) return { error: `Unknown tool ${name}` };
+  const parsed = found.schema.safeParse(args);
+  if (!parsed.success) return { error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
+  return execute(found, ctx, parsed.data);
 }

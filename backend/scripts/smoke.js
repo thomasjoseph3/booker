@@ -506,6 +506,40 @@ await step('staff assistant conversations: kept for history, private to their ow
   await api('POST', `${base}/${managersChat._id}/messages`, { headers: desk, body: { text: 'hi' }, expect: 403 });
 });
 
+await step('staff assistant: answers via LangChain, stores the exchange with its tool trace, and records failures', async () => {
+  const { AIMessage, fakeModel } = await import('langchain');
+  const { sendMessage } = await import('../src/agent/staff/assistant.js');
+  const conversations = await import('../src/modules/conversations/service.js');
+  const hotels = await import('../src/modules/hotels/repository.js');
+  const users = await import('../src/modules/auth/repository.js');
+  const hotel = await hotels.findById(lakesideId);
+  const manager = await users.findByEmailWithPassword('manager@lakesidepalms.local');
+
+  const chat = await conversations.startChat(hotel, manager);
+  const model = fakeModel()
+    .respondWithTools([{ name: 'get_overview', args: {} }])
+    .respond(new AIMessage('There are 30 rooms.'));
+  const answer = await sendMessage(hotel, manager, chat._id, 'How many rooms do we have?', { primary: model });
+  assert.equal(answer.reply, 'There are 30 rooms.');
+  assert.deepEqual([answer.tools[0].name, answer.tools[0].ok], ['get_overview', true]);
+
+  const stored = await conversations.getChat(hotel, manager, chat._id);
+  assert.equal(stored.messageCount, 2);
+  assert.equal(stored.title, 'How many rooms do we have?');
+  assert.deepEqual(
+    stored.messages.map((m) => m.role),
+    ['user', 'assistant'],
+  );
+  assert.equal(stored.messages[1].tools.length, 1);
+  assert.match(stored.messages[1].tools[0].result, /"totalRooms":30/, 'the real tool ran against the real data');
+
+  const broken = fakeModel().alwaysThrow(new Error('429 You exceeded your current quota'));
+  await assert.rejects(sendMessage(hotel, manager, chat._id, 'And now?', { primary: broken }), (e) => e.status === 429);
+  const after = await conversations.getChat(hotel, manager, chat._id);
+  assert.equal(after.messages.at(-1).role, 'system', 'the failure is part of the history');
+  assert.match(after.messages.at(-1).text, /quota is used up/);
+});
+
 await step('calls left open by a crash are closed with an explanation', async () => {
   const calls = await import('../src/modules/calls/repository.js');
   const { closeStaleCalls } = await import('../src/modules/calls/service.js');

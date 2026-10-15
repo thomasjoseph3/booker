@@ -1,107 +1,78 @@
+import { createAgent, modelCallLimitMiddleware, modelFallbackMiddleware } from 'langchain';
 import { config } from '../../config.js';
 import { getChat, getWritableChat, recordExchange, startChat } from '../../modules/conversations/service.js';
-import { generateContent } from '../shared/gemini.js';
+import { createModels, toApiError } from '../shared/model.js';
 import { buildStaffPrompt } from './prompt.js';
-import { runStaffTool, staffFunctionDeclarations } from './tools.js';
+import { buildStaffTools } from './tools.js';
 
 /**
- * Turn-based assistant for hotel staff (Gemini function calling over read-only tools).
- * Every exchange, with the tool calls behind each answer, is stored in the conversation for history and debugging.
+ * The assistant for hotel staff, built on LangChain: a tool-calling agent (`createAgent`) with read-only tools,
+ * model fallbacks and a cap on tool rounds. Every exchange, with the tool calls behind each answer, is stored in the
+ * conversation for history and debugging. The stored messages are the source of truth for context, so conversations
+ * survive restarts and work across several server instances.
  */
 
-const MAX_TOOL_ROUNDS = 6;
-const MAX_LOGGED_RESULT = 2000;
-const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+const MAX_MODEL_CALLS = 8; // tool rounds in one answer
+const HISTORY_LIMIT = 30; // earlier messages sent to the model
+const STUCK = 'I got stuck looking that up. Could you rephrase or narrow the question?';
+const LIMIT_REACHED = /call limits? exceeded/i; // what the call-limit middleware says when it stops a looping model
 
-/** chatId -> { contents, usedAt }: the Gemini conversation, including tool calls, so context survives between messages. */
-const sessions = new Map();
+export { getChat, startChat };
 
-export { startChat };
-
-/** Gemini conversation for a chat: the live one, or rebuilt from the stored text if the server restarted. */
-function contentsFor(chat) {
-  for (const [id, s] of sessions) if (Date.now() - s.usedAt > SESSION_TTL_MS) sessions.delete(id);
-  let session = sessions.get(String(chat._id));
-  if (!session) {
-    const contents = chat.messages
-      .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.text }] }));
-    session = { contents, usedAt: Date.now() };
-    sessions.set(String(chat._id), session);
-  }
-  session.usedAt = Date.now();
-  return session.contents;
+/**
+ * Runs the agent on `history` plus the new question and returns the final answer. A pure function of its inputs
+ * (model, tools, prompt), so it can be tested with a fake model.
+ * @param {{primary: object, fallbacks?: object[]}} models
+ * @param {{role: string, content: string}[]} messages Earlier turns followed by the new question
+ * @returns {Promise<string>}
+ */
+export async function runAssistant({ models, tools, systemPrompt, messages }) {
+  const agent = createAgent({
+    model: models.primary,
+    tools,
+    systemPrompt,
+    middleware: [modelFallbackMiddleware(...(models.fallbacks ?? [])), modelCallLimitMiddleware({ runLimit: MAX_MODEL_CALLS })],
+  });
+  // Each model call is several graph steps once middleware is involved; give the graph room so the call cap is what stops a loop.
+  const result = await agent.invoke({ messages }, { recursionLimit: MAX_MODEL_CALLS * 8 });
+  const answer = result.messages.at(-1)?.text?.trim();
+  return !answer || LIMIT_REACHED.test(answer) ? STUCK : answer;
 }
 
 /**
- * Sends the user's message, lets the model use tools until it can answer, stores the exchange and returns the reply.
- * If the model call fails, the error is stored in the conversation too, so nothing is lost.
+ * Sends the user's message and returns the reply. Both are stored in the conversation, and so is any failure.
  * @returns {Promise<{reply: string, tools: object[]}>}
  */
-export async function sendMessage(hotel, user, chatId, text) {
+export async function sendMessage(hotel, user, chatId, text, models = createModels({ temperature: 0.3, maxOutputTokens: 1200 })) {
   const chat = await getWritableChat(hotel, user, chatId);
-  const contents = contentsFor(chat);
+  const history = chat.messages.filter((m) => m.role !== 'system').slice(-HISTORY_LIMIT);
   const userMessage = { role: 'user', text, at: new Date() };
-  const mark = contents.length;
+  const trace = [];
   const started = Date.now();
-  const tools = [];
 
   try {
-    contents.push({ role: 'user', parts: [{ text }] });
-    let reply = '';
-    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-      const data = await generateContent({
-        systemInstruction: { parts: [{ text: buildStaffPrompt(hotel, user) }] },
-        contents,
-        tools: [{ functionDeclarations: staffFunctionDeclarations }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
-      });
-      const content = data.candidates?.[0]?.content;
-      if (!content?.parts?.length) throw new Error('The model returned an empty answer');
-      contents.push(content); // keep verbatim (includes Gemini's thought signatures)
-      const calls = content.parts.filter((p) => p.functionCall);
-      if (!calls.length) {
-        reply = content.parts
-          .map((p) => p.text || '')
-          .join('')
-          .trim();
-        break;
-      }
-      const responses = [];
-      for (const { functionCall: call } of calls) {
-        const t0 = Date.now();
-        const result = await runStaffTool({ hotel, user }, call.name, call.args || {});
-        tools.push({
-          name: call.name,
-          args: call.args || {},
-          ok: !result.error,
-          ms: Date.now() - t0,
-          error: result.error,
-          result: JSON.stringify(result).slice(0, MAX_LOGGED_RESULT),
-        });
-        responses.push({ functionResponse: { name: call.name, response: { result } } });
-      }
-      contents.push({ role: 'user', parts: responses });
-    }
-    reply ||= 'I got stuck looking that up. Could you rephrase or narrow the question?';
+    const reply = await runAssistant({
+      models,
+      tools: buildStaffTools({ hotel, user }, trace),
+      systemPrompt: buildStaffPrompt(hotel, user),
+      messages: [...history.map((m) => ({ role: m.role, content: m.text })), { role: 'user', content: text }],
+    });
     const assistantMessage = {
       role: 'assistant',
       text: reply,
       at: new Date(),
-      tools,
+      tools: trace,
       model: config.gemini.models[0],
       ms: Date.now() - started,
     };
     await recordExchange(chat, [userMessage, assistantMessage]);
-    return { reply, tools };
+    return { reply, tools: trace };
   } catch (e) {
-    contents.length = mark; // drop the half-finished turn so the next message starts clean
+    const error = toApiError(e);
     await recordExchange(chat, [
       userMessage,
-      { role: 'system', text: `Assistant error: ${e.message}`, at: new Date(), tools, ms: Date.now() - started },
+      { role: 'system', text: `Assistant error: ${error.message}`, at: new Date(), tools: trace, ms: Date.now() - started },
     ]);
-    throw e;
+    throw error;
   }
 }
-
-export { getChat };
