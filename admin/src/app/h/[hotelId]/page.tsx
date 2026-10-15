@@ -15,7 +15,7 @@ type Dashboard = {
   occupancyTonight: { booked: number; totalRooms: number; percent: number };
   occupancy: { date: string; booked: number; totalRooms: number; percent: number }[];
   arrivals: Booking[]; departures: Booking[];
-  counts: { inHouse: number; pendingPayment: number; openCallbacks: number; callsToday: number; bookingsToday: number };
+  counts: { inHouse: number; pendingPayment: number; callsToday: number; bookingsToday: number };
   revenue30d: { collected: number; refunded: number; net: number };
   roomStatus: { available: number; occupied: number; cleaning: number; out_of_service: number };
 };
@@ -45,13 +45,12 @@ async function DashboardContent({ params }: { params: PageProps<"/h/[hotelId]">[
     <>
       <PageHeader title={hotel.name} subtitle={`Today · ${new Date(`${d.today}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" })}`} />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <Stat label="Occupancy tonight" value={`${d.occupancyTonight.percent}%`} hint={`${d.occupancyTonight.booked} of ${d.totalRooms} rooms`} href={`${base}/inventory`} />
         <Stat label="In house" value={d.counts.inHouse} hint="bookings checked in" href={`${base}/bookings?view=in_house`} />
         <Stat label="Arrivals today" value={d.arrivals.length} hint={`${pendingArrivals} still to check in`} href={`${base}/bookings?view=arrivals`} />
         <Stat label="Departures today" value={d.departures.length} hint={`${pendingDepartures} still to check out`} href={`${base}/bookings?view=departures`} />
         <Stat label="Rooms on hold" value={d.counts.pendingPayment} hint="awaiting advance" href={`${base}/bookings?status=pending_payment`} />
-        <Stat label="Open callbacks" value={d.counts.openCallbacks} hint="need a human" href={`${base}/callbacks`} />
         <Stat label="Agent calls" value={d.counts.callsToday} hint="last 24 hours" href={`${base}/calls`} />
         <Stat label="Net collected" value={compactMoney(d.revenue30d.net, c)} hint="last 30 days" href={`${base}/payments`} />
       </div>

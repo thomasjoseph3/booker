@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Fraunces } from "next/font/google";
 import "./globals.css";
 
@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   title: "Book your stay",
   description: "Talk to our reservations team and book your stay in minutes.",
 };
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#1f5c46" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

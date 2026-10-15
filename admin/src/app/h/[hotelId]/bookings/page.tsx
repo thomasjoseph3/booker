@@ -14,7 +14,7 @@ const SOURCES = [["", "Any source"], ["phone_agent", "Phone agent"], ["website",
 export default function BookingsPage(props: PageProps<"/h/[hotelId]/bookings">) {
   return (
     <>
-      <PageHeader title="Bookings" subtitle="Every reservation across all channels" />
+      <PageHeader title="Bookings" subtitle="Every reservation across all channels" actions={<Link href="bookings/new" className={buttonClass("primary")}>＋ New booking</Link>} />
       <Suspense fallback={<PageSkeleton rows={12} />}>
         <BookingsContent {...props} />
       </Suspense>

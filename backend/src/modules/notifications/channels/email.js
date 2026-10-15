@@ -16,7 +16,7 @@ const SUBJECTS = {
 };
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const toHtml = (text) =>
+export const toHtml = (text) =>
   esc(text)
     .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')
     .replace(/\*([^*\n]+)\*/g, '<b>$1</b>')

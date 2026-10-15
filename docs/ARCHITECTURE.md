@@ -48,7 +48,8 @@ src/
     bookings/        lifecycle (service), stay rules, availability search, pricing, audit history
     payments/        payment links and refunds (service), gateways (providers/), webhooks and test pay page
     guests/          guest profiles and stats
-    calls/           call logs, callbacks (staff tasks), raiseStaffTask()
+    calls/           call logs, callbacks (staff tasks), raiseStaffTask(), closing calls left open by a crash
+    conversations/   staff assistant chats (history), who may see whose
     notifications/   guest messages: templates, email and WhatsApp channels, message log
     analytics/       dashboard and analytics aggregations
     public/          unauthenticated property info for the guest website
@@ -57,27 +58,37 @@ src/
 Each module folder contains some of `routes.js`, `service.js`, `repository.js`, plus feature-specific files. Modules
 without business rules (for example `notifications`) have no service.
 
-## The agent module
+## The agents
 
-Everything the AI receptionist needs is under `src/agent/`, behind `agent/index.js`:
+There are two AI agents with different users, permissions and tools, under `src/agent/` (entry point: `agent/index.js`):
 
-| File | Purpose |
+```
+agent/
+  guest/    The receptionist guests talk to (website call, later phone). Books and manages the caller's own bookings.
+  staff/    The assistant for signed-in hotel staff. Read-only answers about analytics, availability, bookings, ...
+  shared/   gemini.js, the Gemini text client (with rate-limit fallback between models)
+```
+
+| Guest agent (`guest/`) | Purpose |
 |---|---|
-| `routes.js` | The HTTP API the agent uses as its tools (`/api/agent/*`), authenticated by API key |
-| `auth.js` | Agent API-key authentication (per-hotel key, or master key + `x-hotel-id`) |
-| `tools.js` | Tool definitions: what the agent may do, and which endpoint implements each |
-| `prompt.js` | Persona, speaking style and rules. Tune the agent's behaviour here |
-| `toolRunner.js` | Executes a tool call by calling the agent API |
 | `liveAgent.js` | Real-time audio calls: WebSocket server bridging the browser and Gemini Live |
-| `textAgent.js` | Turn-based text agent used by the admin "Talk to agent" tester |
-| `gemini.js` | Gemini text client with rate-limit fallback between models |
-| `callRecord.js` | Writes the call log: transcript, outcome, summary |
-| `session.js` | State of one call (caller, tools used, bookings made) |
+| `prompt.js` | Persona, speaking style and booking rules. Tune the receptionist here |
+| `tools.js`, `toolRunner.js` | What the agent may do, and execution of a tool call (logged with args, result and timing) |
+| `routes.js`, `auth.js` | The HTTP API the agent uses as its tools (`/api/agent/*`), authenticated by API key |
+| `callRecord.js`, `session.js` | Call log (transcript, outcome, summary, errors) and per-call state |
 | `views.js` | Agent-friendly shapes of bookings and property facts |
-| `adminRoutes.js` | Admin endpoints for the browser test call |
 
-The agent changes hotel data only through its tools (the agent API), never by touching the database. See
-[VOICE_AGENT.md](VOICE_AGENT.md) for how the real-time call works.
+| Staff assistant (`staff/`) | Purpose |
+|---|---|
+| `assistant.js` | Chat loop: model + tools, stores every exchange with the tool calls behind it |
+| `tools.js` | 15 read-only lookups (overview, analytics, availability, bookings, rooms, payments, callbacks, calls, guests, property info), scoped to the user's property |
+| `prompt.js`, `views.js` | Persona/rules, and compact shapes of data for the model |
+| `routes.js` | `/api/admin/hotels/:hotelId/assistant/*`, any signed-in staff member, rate limited per user |
+
+Rules for both agents: they change or read hotel data only through the same services and APIs the dashboard uses, never
+through the database directly; tool failures come back as `{ error }` so the model can explain them; and everything they
+do is recorded (guest calls in the call log, staff chats in `modules/conversations`) for history and debugging.
+See [VOICE_AGENT.md](VOICE_AGENT.md) for how the real-time call works.
 
 ## Adding a feature
 
@@ -89,8 +100,23 @@ The agent changes hotel data only through its tools (the agent API), never by to
 ## Conventions
 
 - ES modules, 2-space indent, single quotes, 140-column lines (Prettier: `npm run format`).
-- `npm run lint` must pass (ESLint, including the layering rule). `npm test` must pass (25 end-to-end checks on a throwaway database).
+- `npm run lint` must pass (ESLint, including the layering rule). `npm test` must pass: unit tests, then the end-to-end suite.
 - Errors: throw `ApiError` helpers from `utils/errors.js` (`badRequest`, `notFound`, `conflict`, ...); the error middleware turns them into `{ error: { code, message } }`.
 - Comments explain *why* and document exported functions; they don't restate the code.
 - Dates are `YYYY-MM-DD` strings in the property's timezone (`utils/dates.js`). Money is rounded with `round2`.
 - Every record carries `hotel`, and every query is scoped to it (multi-tenant).
+
+## Testing
+
+| Command | What it runs |
+|---|---|
+| `npm run test:unit` | Fast unit tests (`backend/test/unit`, Node's built-in test runner, no database, no network, no API keys) |
+| `npm run smoke` | End-to-end suite (`scripts/smoke.js`, 28 checks): the real API against a throwaway database, including race conditions, holds expiring, refunds, tenant isolation and the staff assistant's tools and permissions |
+| `npm test` | Both |
+| `npm run test:coverage` | Unit tests with a coverage table |
+
+Unit tests cover the logic that does not need a database: pricing, stay rules, cancellation policy, validation, message
+templates, email rendering, agent tool definitions, prompts and the staff assistant's data shaping. `test/setup.js` pins the
+environment (no real emails or keys) so results do not depend on a developer's `.env`. Business workflows that need the
+database (booking creation, payment outcomes, inventory races) are covered by the end-to-end suite. Add a unit test next to
+any new pure logic and a step to `smoke.js` for any new endpoint.

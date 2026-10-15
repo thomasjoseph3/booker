@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { api } from "./api";
-import type { AvailabilityOption, Booking, Payment } from "./types";
+import type { AssistantChat, AvailabilityOption, Booking, Payment, ToolTrace } from "./types";
 
 export type ActionResult<T = unknown> = { ok: true; data: T; message?: string } | { ok: false; message: string };
 
@@ -59,9 +59,6 @@ export async function createBooking(hotelId: string, body: Record<string, unknow
 export async function updateRoomStatus(hotelId: string, roomId: string, status: string) {
   return run(() => api(`/hotels/${hotelId}/rooms/${roomId}`, { method: "PATCH", body: { status } }), "Room updated");
 }
-export async function updateCallback(hotelId: string, id: string, body: { status?: string; notes?: string; assignedTo?: string }) {
-  return run(() => api(`/hotels/${hotelId}/callbacks/${id}`, { method: "PATCH", body }), "Callback updated");
-}
 export async function setStopSell(hotelId: string, body: { roomTypeId: string; from: string; to: string; closed: boolean }) {
   return run(() => api(`/hotels/${hotelId}/inventory/stop-sell`, { method: "PUT", body }));
 }
@@ -92,16 +89,16 @@ export async function rotateAgentKey(hotelId: string) {
   return run(() => api<{ apiKey: string }>(`/hotels/${hotelId}/agent-key`, { method: "POST" }), "New key generated");
 }
 
-// ---- browser test call (voice agent) ----
-export type VoiceTurn = { reply: string; tools: { name: string; ok: boolean }[] };
-export type VoiceEnd = { callId: string; outcome?: string; summary?: string; durationSec?: number };
-
-export async function startVoiceCall(hotelId: string, callerPhone: string, callerEmail: string) {
-  return run(() => api<{ callId: string; greeting: string }>(`/hotels/${hotelId}/voice/start`, { method: "POST", body: { callerPhone, callerEmail } }));
+// ---- staff assistant ----
+export async function listAssistantChats(hotelId: string, scope: "mine" | "all") {
+  return run(async () => (await api<{ items: AssistantChat[] }>(`/hotels/${hotelId}/assistant/chats`, { query: { scope } })).items);
 }
-export async function voiceTurn(hotelId: string, callId: string, text: string) {
-  return run(() => api<VoiceTurn>(`/hotels/${hotelId}/voice/turn`, { method: "POST", body: { callId, text } }));
+export async function createAssistantChat(hotelId: string) {
+  return run(() => api<AssistantChat>(`/hotels/${hotelId}/assistant/chats`, { method: "POST" }));
 }
-export async function endVoiceCall(hotelId: string, callId: string) {
-  return run(() => api<VoiceEnd>(`/hotels/${hotelId}/voice/end`, { method: "POST", body: { callId } }));
+export async function loadAssistantChat(hotelId: string, chatId: string) {
+  return run(() => api<AssistantChat>(`/hotels/${hotelId}/assistant/chats/${chatId}`));
+}
+export async function sendAssistantMessage(hotelId: string, chatId: string, text: string) {
+  return run(() => api<{ reply: string; tools: ToolTrace[] }>(`/hotels/${hotelId}/assistant/chats/${chatId}/messages`, { method: "POST", body: { text } }));
 }

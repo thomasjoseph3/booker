@@ -17,7 +17,7 @@ const callLogSchema = new Schema(
     transcript: [
       { role: { type: String, enum: ['caller', 'agent', 'system', 'tool'] }, text: String, at: Date, data: Schema.Types.Mixed, _id: false },
     ],
-    channel: { type: String, enum: ['web_live', 'web_text', 'phone'] }, // how the call reached the agent
+    channel: { type: String, enum: ['web_live', 'phone'] }, // how the call reached the agent
     model: String, // the AI model that handled it
     summary: String,
     intent: String,

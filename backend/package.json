@@ -12,7 +12,10 @@
     "demo:call": "node scripts/demo-call.js",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.js\" \"scripts/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\" \"scripts/**/*.js\""
+    "format:check": "prettier --check \"src/**/*.js\" \"scripts/**/*.js\"",
+    "test": "npm run test:unit && npm run smoke",
+    "test:unit": "node --test --import ./test/setup.js test/unit",
+    "test:coverage": "node --test --experimental-test-coverage --import ./test/setup.js test/unit"
   },
   "engines": {
     "node": ">=20"

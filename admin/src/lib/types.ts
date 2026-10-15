@@ -104,28 +104,15 @@ export interface CallLog {
   startedAt?: string;
   endedAt?: string;
   durationSec?: number;
-  transcript?: { role: "caller" | "agent" | "system" | "tool"; text: string; at?: string }[];
+  transcript?: { role: "caller" | "agent" | "system" | "tool"; text: string; at?: string; data?: Record<string, unknown> }[];
+  channel?: "web_live" | "phone";
+  model?: string;
   summary?: string;
   intent?: string;
   outcome?: string;
   sentiment?: string;
   bookings: { _id: string; code: string; status: BookingStatus; checkIn?: string; checkOut?: string }[];
   recordingUrl?: string;
-  createdAt: string;
-}
-
-export interface Callback {
-  _id: string;
-  name?: string;
-  phone: string;
-  reason: string;
-  priority: "low" | "normal" | "high";
-  booking?: { _id: string; code: string; status: BookingStatus };
-  callId?: string;
-  status: "open" | "in_progress" | "done";
-  assignedTo?: string;
-  notes?: string;
-  createdBy?: string;
   createdAt: string;
 }
 
@@ -194,4 +181,31 @@ export interface AvailabilityOption {
 export interface CancellationQuote {
   cancellable: boolean; reason?: string; freeCancellation?: boolean; hoursBeforeCheckIn?: number; freeUntilHours?: number;
   amountPaid?: number; fee?: number; refundAmount?: number; currency?: string; policy?: string;
+}
+
+export interface ToolTrace {
+  name: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  ms: number;
+  error?: string;
+  result?: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  text: string;
+  at: string;
+  tools?: ToolTrace[];
+  model?: string;
+  ms?: number;
+}
+
+export interface AssistantChat {
+  _id: string;
+  title: string;
+  messageCount: number;
+  lastMessageAt: string;
+  user?: { _id: string; name: string; email: string };
+  messages?: ChatMessage[];
 }

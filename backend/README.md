@@ -7,7 +7,7 @@ See the root [README](../README.md) for setup, [docs/API.md](../docs/API.md) for
 ```bash
 npm run dev          # http://localhost:4000
 npm run seed         # reset DB + demo data   (--no-demo for properties only)
-npm run smoke        # end-to-end test suite on a throwaway database
+npm test             # unit tests + end-to-end suite (npm run test:unit for just the fast ones)
 npm run lint         # ESLint, including the "only repositories import models" rule
 npm run format       # Prettier
 npm run demo:call    # simulated phone booking through the agent API (API must be running)

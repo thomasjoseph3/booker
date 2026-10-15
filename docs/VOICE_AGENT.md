@@ -25,7 +25,7 @@ existed and is reused unchanged.
 | Server WebSocket | **`ws`** npm package | Standard Node WebSocket server and client. |
 | Tool calling | Gemini function calling, tool schemas in `backend/src/agent/tools.js` | The model decides when to check availability or book; the backend executes it against the real API. |
 | Guest messages | **Nodemailer over SMTP** (Gmail app password for now) | WhatsApp setup was pending; email works immediately. `GUEST_CHANNELS` selects email, WhatsApp or both. |
-| Text-only fallback agent | Gemini REST `generateContent` | Used by the admin "Talk to agent" tester and for call summaries. |
+| Summaries and the staff assistant | Gemini REST `generateContent` | End-of-call summaries and the admin assistant (text, with tools). |
 
 Not used (yet): LiveKit, Pipecat, Deepgram, ElevenLabs, a telephony provider. They are possible upgrades (section 8).
 
@@ -97,13 +97,14 @@ Binary frames are audio. Text frames are JSON events.
 | `backend/src/agent/toolRunner.js` | Turns a model tool call into a call to the agent API |
 | `backend/src/agent/routes.js` | The booking API the agent uses as tools (`/api/agent/*`) |
 | `backend/src/agent/callRecord.js` | Call log: open, append transcript, close with outcome and summary |
-| `backend/src/agent/textAgent.js`, `gemini.js` | Text-turn agent used by the admin tester, and the Gemini REST client |
+| `backend/src/agent/shared/gemini.js` | Gemini text client (call summaries and the staff assistant) |
+| `backend/src/agent/staff/` | The separate, read-only staff assistant (see ARCHITECTURE.md) |
 | `backend/src/modules/notifications/` | Guest messages by email and/or WhatsApp |
 | `backend/src/modules/public/` | Unauthenticated property info for the website |
 | `site/src/lib/live-call.ts` | Browser audio engine: mic capture, WebSocket, gapless playback, level meter |
 | `site/src/components/call-dialog.tsx` | Call screen: orb, captions, mute, hang up |
 | `site/src/components/property-page.tsx` | Landing page: rooms, amenities, FAQ |
-| `admin/src/app/h/[hotelId]/talk/` | Older text-turn tester inside the admin |
+| `admin/src/app/h/[hotelId]/assistant/` | The staff assistant chat page with conversation history |
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for how the backend is layered.
 

@@ -97,9 +97,9 @@ export function CallDialog({ slug, hotelName, onClose }: { slug: string; hotelNa
   const lastTwo = lines.slice(-2);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={`Call ${hotelName}`} className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="relative flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-[#0f2b21] text-white shadow-2xl">
-        <button onClick={close} aria-label="Close" className="absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-full bg-white/10 text-lg hover:bg-white/20">×</button>
+    <div role="dialog" aria-modal="true" aria-label={`Call ${hotelName}`} className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:p-4">
+      <div className="relative flex max-h-[96dvh] w-full max-w-md flex-col overflow-y-auto rounded-3xl bg-[#0f2b21] pb-[env(safe-area-inset-bottom)] text-white shadow-2xl">
+        <button onClick={close} aria-label="Close" className="absolute right-3 top-3 z-10 grid size-10 place-items-center rounded-full bg-white/10 text-xl hover:bg-white/20">×</button>
 
         <div className="px-8 pb-2 pt-8 text-center">
           <p className="text-xs uppercase tracking-[0.2em] text-white/60">{phase === "live" ? `Connected · ${mm}:${ss}` : phase === "connecting" ? "Connecting…" : phase === "ended" ? "Call ended" : "Reservations"}</p>
@@ -125,13 +125,13 @@ export function CallDialog({ slug, hotelName, onClose }: { slug: string; hotelNa
 
         {(phase === "connecting" || phase === "live") && (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="grid place-items-center py-8">
+            <div className="grid place-items-center py-6 sm:py-8">
               <div className="relative grid size-36 place-items-center">
                 {phase === "connecting" && <span className="ring absolute inset-0 rounded-full bg-[#3ecf8e]/40" />}
                 <div ref={orb} className="size-28 rounded-full bg-gradient-to-br from-[#7ff0bd] to-[#1f8a5f] shadow-[0_0_60px_rgba(62,207,142,0.55)] transition-transform duration-75" />
               </div>
             </div>
-            <div ref={captions} className="min-h-[88px] flex-1 space-y-2 overflow-y-auto px-8 pb-2 text-center">
+            <div ref={captions} className="min-h-[88px] max-h-[30dvh] flex-1 space-y-2 overflow-y-auto px-6 pb-2 text-center sm:px-8">
               {lastTwo.map((l, i) => (
                 <p key={`${lines.length}-${i}`} className={clsx("text-balance leading-snug", l.role === "agent" ? "text-lg text-white" : "text-sm text-white/55")}>
                   {l.role === "caller" && <span className="mr-1 text-white/35">You:</span>}{l.text}

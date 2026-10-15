@@ -195,9 +195,12 @@ Everything below is under `/api/admin/hotels/:hotelId`:
 | `POST /payments/:id/mark-refunded` | all | Close a manual (offline) refund |
 | `GET /guests?q`, `GET /guests/:id`, `PATCH /guests/:id` | all | Guests with lifetime stats; profile with bookings and calls; VIP and notes |
 | `GET /calls?outcome`, `GET /calls/:id` | all | Call log and full transcript |
-| `GET /callbacks?status`, `PATCH /callbacks/:id` | all | Hand-off queue `{ status, notes, assignedTo, priority }` |
+| `GET /callbacks?status`, `PATCH /callbacks/:id` | all | Staff task queue (agent hand-offs, failed refunds, undeliverable messages). No screen in the dashboard; the staff assistant reports on it |
 | `GET /notifications` | all | Every message sent to guests (email and WhatsApp) |
-| `POST /voice/start`, `/voice/turn`, `/voice/end` | all | Browser test call with the text agent (used by the admin "Talk to agent" page) |
+| `GET /assistant/chats?scope=mine\|all` | all | The staff assistant's conversation history (`all` is honoured for managers only) |
+| `POST /assistant/chats` | all | Start a conversation |
+| `GET /assistant/chats/:id` | owner, managers | A conversation with every message and the tool calls behind each answer |
+| `POST /assistant/chats/:id/messages` | owner | `{ text }`. Returns `{ reply, tools }`. Read-only assistant; 20 messages per minute per user |
 
 ---
 

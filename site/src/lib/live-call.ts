@@ -68,11 +68,14 @@ export class LiveCall {
   get speaking() { return this.sources.size > 0; }
 
   async start() {
-    // Mic first, so a permission problem fails before we open a line.
-    this.mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    // Browsers (iOS Safari especially) only let audio start inside the user's tap. Create and unlock both audio
+    // contexts first, synchronously, before anything is awaited; then ask for the mic.
     this.outCtx = new AudioContext();
     this.inCtx = new AudioContext();
-    await Promise.all([this.outCtx.resume(), this.inCtx.resume()]);
+    const unlocked = Promise.all([this.outCtx.resume(), this.inCtx.resume()]);
+    // Mic next, so a permission problem fails before we open a line.
+    this.mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    await unlocked;
     this.analyser = this.outCtx.createAnalyser();
     this.analyser.fftSize = 512;
     this.analyser.connect(this.outCtx.destination);

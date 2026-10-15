@@ -2,7 +2,7 @@
 
 A multi-property hotel booking platform with an AI voice receptionist. Each hotel or resort gets rooms, live
 availability, pricing, advance-payment holds, guest messaging (email and WhatsApp), call logs and analytics, a
-dashboard for its staff, and a public website where guests can **call the AI agent from the browser** to book.
+dashboard for its staff (with an AI assistant they can ask about analytics, availability and bookings), and a public website where guests can **call the AI agent from the browser** to book.
 
 The platform supports many hotels and resorts; the demo focuses on **one property** (Lakeside Palms Resort, 30 rooms).
 
@@ -53,7 +53,8 @@ For the voice agent add `GEMINI_API_KEY` to `backend/.env` (see [Going live](#go
 ### Other commands
 
 ```bash
-npm test          # end-to-end API test suite on a throwaway database (25 checks: race conditions, a 2nd hotel for isolation, …)
+npm test          # unit tests, then the end-to-end suite on a throwaway database (28 checks: race conditions, a 2nd hotel for isolation, …)
+npm --prefix backend run test:unit   # just the fast unit tests
 npm run lint      # ESLint on backend, admin and site (backend also enforces the layering rules)
 npm run format    # Prettier on the backend
 npm run check     # verifies the live database: no overbooking, inventory matches bookings
@@ -160,17 +161,17 @@ backend/
     app.js, server.js, config.js, jobs.js   Express app, startup, settings, hold-expiry sweeper
     routes/admin.js                         Composes the admin API
     modules/                                One folder per feature: routes.js -> service.js -> repository.js
-      auth hotels rooms inventory bookings payments guests calls notifications analytics public
-    agent/                                  The AI receptionist: tools, prompt, live audio, text agent, call records
+      auth hotels rooms inventory bookings payments guests calls conversations notifications analytics public
+    agent/                                  guest/ (the receptionist), staff/ (the dashboard assistant), shared/
     models/                                 Mongoose schemas
     middleware/ utils/ validation.js        Shared plumbing
   scripts/seed.js, today-snapshot.js        Demo property and today's guests
   scripts/demo-call.js                      Simulated phone booking through the agent API
-  scripts/smoke.js                          End-to-end test suite
+  scripts/smoke.js, test/unit/              End-to-end suite and unit tests
   scripts/check-data.js, test-email.js      Database integrity check; send a sample guest email
 admin/
   src/app/login                             Sign in (session stored in an httpOnly cookie)
-  src/app/h/[hotelId]/…                     Dashboard, bookings, calls, analytics, guests, callbacks, rooms, availability, payments, messages, settings, talk-to-agent
+  src/app/h/[hotelId]/…                     Dashboard, bookings, assistant, agent calls, analytics, guests, rooms, availability, payments, messages, settings
   src/lib/api.ts, actions.ts                Server-side API client and server actions (the browser never sees the token)
 site/
   src/app/                                  Public hotel page(s)

@@ -33,16 +33,25 @@ async function CallContent({ params }: PageProps<"/h/[hotelId]/calls/[callId]">)
         <Card title="Transcript">
           {!call.transcript?.length ? <p className="text-muted">No transcript recorded.</p> : (
             <div className="space-y-2">
-              {call.transcript.map((t, i) => t.role === "tool" || t.role === "system" ? (
-                <div key={i} className="mx-auto max-w-[90%] rounded-md bg-panel-2 px-2 py-1 text-center font-mono text-[11px] text-muted">⚙ {t.text}</div>
-              ) : (
-                <div key={i} className={clsx("flex", t.role === "agent" ? "justify-end" : "justify-start")}>
-                  <div className={clsx("max-w-[80%] rounded-2xl px-3.5 py-2", t.role === "agent" ? "rounded-br-sm bg-accent-soft" : "rounded-bl-sm bg-panel-2")}>
-                    <div className="mb-0.5 text-[11px] text-muted">{t.role === "agent" ? "Agent" : "Caller"}{t.at && ` · ${time(t.at, tz)}`}</div>
-                    {t.text}
+              {call.transcript.map((t, i) => {
+                if (t.role === "tool") return <ToolLine key={i} entry={t} />;
+                if (t.role === "system") {
+                  const problem = t.text.startsWith("⚠");
+                  return (
+                    <div key={i} className={clsx("mx-auto max-w-[95%] rounded-md px-2 py-1 text-center text-[11px]", problem ? "bg-bad-soft font-medium text-bad" : "bg-panel-2 text-muted")}>
+                      {t.text}{t.at && ` · ${time(t.at, tz)}`}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={i} className={clsx("flex", t.role === "agent" ? "justify-end" : "justify-start")}>
+                    <div className={clsx("max-w-[85%] rounded-2xl px-3.5 py-2 sm:max-w-[80%]", t.role === "agent" ? "rounded-br-sm bg-accent-soft" : "rounded-bl-sm bg-panel-2")}>
+                      <div className="mb-0.5 text-[11px] text-muted">{t.role === "agent" ? "Agent" : "Caller"}{t.at && ` · ${time(t.at, tz)}`}</div>
+                      {t.text}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
@@ -52,7 +61,9 @@ async function CallContent({ params }: PageProps<"/h/[hotelId]/calls/[callId]">)
               <div className="flex justify-between gap-2"><dt className="text-muted">Outcome</dt><dd><Badge value={call.outcome} /></dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Intent</dt><dd className="capitalize">{label(call.intent) || "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Sentiment</dt><dd><Badge value={call.sentiment} /></dd></div>
-              <div className="flex justify-between gap-2"><dt className="text-muted">Dialed</dt><dd>{call.toNumber}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted">Dialed</dt><dd>{call.toNumber ?? "—"}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted">Channel</dt><dd>{label(call.channel) || "—"}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted">Model</dt><dd className="truncate font-mono text-xs">{call.model ?? "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Call ID</dt><dd className="truncate font-mono text-xs">{call.callId}</dd></div>
             </dl>
             {call.summary && <p className="mt-3 rounded-lg bg-panel-2 p-3 text-ink-2">{call.summary}</p>}
@@ -80,5 +91,23 @@ async function CallContent({ params }: PageProps<"/h/[hotelId]/calls/[callId]">)
         </div>
       </div>
     </>
+  );
+}
+
+/** A tool the agent used. Expand it to see exactly what it asked for and what came back (for debugging). */
+function ToolLine({ entry }: { entry: NonNullable<CallLog["transcript"]>[number] }) {
+  const data = entry.data as { args?: unknown; result?: string; ok?: boolean; error?: string } | undefined;
+  const failed = data?.ok === false;
+  return (
+    <details className={clsx("mx-auto max-w-[95%] rounded-md px-2 py-1 text-[11px]", failed ? "bg-bad-soft text-bad" : "bg-panel-2 text-muted")}>
+      <summary className="cursor-pointer select-none text-center font-mono">⚙ {entry.text}</summary>
+      {data && (
+        <div className="mt-2 space-y-1.5 overflow-x-auto text-left font-mono text-ink-2">
+          <div><span className="text-muted">asked for:</span> {JSON.stringify(data.args)}</div>
+          {data.error && <div className="text-bad">error: {data.error}</div>}
+          {data.result && <div className="break-all"><span className="text-muted">returned:</span> {data.result}</div>}
+        </div>
+      )}
+    </details>
   );
 }

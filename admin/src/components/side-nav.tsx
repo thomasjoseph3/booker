@@ -7,16 +7,14 @@ import clsx from "clsx";
 const NAV: [string, string, string][] = [
   ["", "Dashboard", "◧"],
   ["/bookings", "Bookings", "▤"],
-  ["/bookings/new", "New booking", "＋"],
-  ["/talk", "Talk to agent", "🎙"],
+  ["/assistant", "Assistant", "✦"],
   ["/calls", "Agent calls", "☏"],
   ["/analytics", "Analytics", "▥"],
   ["/guests", "Guests", "☺"],
-  ["/callbacks", "Callbacks", "↺"],
   ["/rooms", "Rooms & rates", "⌂"],
   ["/inventory", "Availability", "▦"],
   ["/payments", "Payments", "₹"],
-  ["/messages", "Message log", "✉"],
+  ["/messages", "Messages", "✉"],
   ["/settings", "Settings", "⚙"],
 ];
 

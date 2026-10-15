@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { guestTestRoutes, staffAssistantRoutes } from '../agent/index.js';
+import { staffAssistantRoutes } from '../agent/index.js';
 import { loadHotelParam, requireAdmin } from '../middleware/auth.js';
 import analytics from '../modules/analytics/routes.js';
 import { accountRouter, loginRouter } from '../modules/auth/routes.js';
@@ -26,18 +26,7 @@ router.param('hotelId', loadHotelParam);
 router.use(hotels);
 
 const scoped = Router({ mergeParams: true });
-for (const feature of [
-  analytics,
-  rooms,
-  inventory,
-  bookings,
-  payments,
-  guests,
-  calls,
-  notifications,
-  guestTestRoutes,
-  staffAssistantRoutes,
-])
+for (const feature of [analytics, rooms, inventory, bookings, payments, guests, calls, notifications, staffAssistantRoutes])
   scoped.use(feature);
 router.use('/hotels/:hotelId', scoped);
 
