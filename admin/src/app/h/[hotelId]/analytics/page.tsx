@@ -11,7 +11,7 @@ export const metadata = { title: "Analytics" };
 type Analytics = {
   days: number; currency: string;
   calls: {
-    total: number; byOutcome: Record<string, number>; bySentiment: Record<string, number>; byLanguage: Record<string, number>; avgDurationSec: number; totalTalkMinutes: number;
+    total: number; byOutcome: Record<string, number>; bySentiment: Record<string, number>; byLanguage?: Record<string, number>; avgDurationSec: number; totalTalkMinutes: number;
     bookingConversion: number; byDay: { date: string; calls: number; booked: number }[]; byHour: { hour: number; calls: number }[];
     topIntents: { intent: string; count: number }[];
   };
@@ -103,9 +103,9 @@ async function AnalyticsContent({ params, searchParams }: PageProps<"/h/[hotelId
               { label: "negative", value: a.calls.bySentiment.negative ?? 0, color: "var(--series-2)" },
             ]} />
           </Card>
-          {Object.keys(a.calls.byLanguage).length > 0 && (
+          {Object.keys(a.calls.byLanguage ?? {}).length > 0 && (
             <Card title="Caller languages">
-              <HBars rows={Object.entries(a.calls.byLanguage).sort((x, y) => y[1] - x[1]).map(([language, value]) => ({ label: language, value }))} />
+              <HBars rows={Object.entries(a.calls.byLanguage ?? {}).sort((x, y) => y[1] - x[1]).map(([language, value]) => ({ label: language, value }))} />
             </Card>
           )}
           <Card title="Top reasons for calling">
