@@ -1,6 +1,6 @@
-import * as bookings from '../modules/bookings/repository.js';
-import * as calls from '../modules/calls/repository.js';
-import { generateContent } from './gemini.js';
+import * as bookings from '../../modules/bookings/repository.js';
+import * as calls from '../../modules/calls/repository.js';
+import { generateContent } from '../shared/gemini.js';
 
 /**
  * Everything that writes the CallLog for an AI call (shown in the admin under "Agent calls"):

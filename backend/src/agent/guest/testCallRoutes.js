@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { validate } from '../middleware/validate.js';
-import { textAgent } from './index.js';
+import { validate } from '../../middleware/validate.js';
+import * as textAgent from './textAgent.js';
 
 const router = Router({ mergeParams: true });
 

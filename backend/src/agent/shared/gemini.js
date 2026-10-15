@@ -1,5 +1,5 @@
-import { config } from '../config.js';
-import { ApiError, badRequest } from '../utils/errors.js';
+import { config } from '../../config.js';
+import { ApiError, badRequest } from '../../utils/errors.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

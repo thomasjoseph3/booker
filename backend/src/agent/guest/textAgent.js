@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
 import { geminiFunctionDeclarations } from './tools.js';
 import { appendTranscript, finishCall, openCallLog } from './callRecord.js';
-import { generateContent } from './gemini.js';
+import { generateContent } from '../shared/gemini.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
 import { runTool } from './toolRunner.js';
-import { badRequest, notFound } from '../utils/errors.js';
-import { normalizePhone } from '../utils/misc.js';
+import { badRequest, notFound } from '../../utils/errors.js';
+import { normalizePhone } from '../../utils/misc.js';
 
 /**
  * Turn-based agent: text in, text out (Gemini function calling). Used by the admin "Talk to agent" tester,

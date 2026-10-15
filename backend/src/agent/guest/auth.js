@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
-import { config } from '../config.js';
-import * as hotels from '../modules/hotels/repository.js';
-import { badRequest, notFound, unauthorized } from '../utils/errors.js';
-import { sha256 } from '../utils/misc.js';
+import { config } from '../../config.js';
+import * as hotels from '../../modules/hotels/repository.js';
+import { badRequest, notFound, unauthorized } from '../../utils/errors.js';
+import { sha256 } from '../../utils/misc.js';
 
 const safeEqual = (a, b) =>
   crypto.timingSafeEqual(crypto.createHash('sha256').update(a).digest(), crypto.createHash('sha256').update(b).digest());

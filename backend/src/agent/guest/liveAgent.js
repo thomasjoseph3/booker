@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
-import { config } from '../config.js';
-import * as hotels from '../modules/hotels/repository.js';
-import { normalizePhone } from '../utils/misc.js';
+import { config } from '../../config.js';
+import * as hotels from '../../modules/hotels/repository.js';
+import { normalizePhone } from '../../utils/misc.js';
 import { appendTranscript, finishCall, openCallLog } from './callRecord.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';

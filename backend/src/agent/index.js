@@ -1,16 +1,13 @@
 /**
- * The AI agent module: everything the voice/text receptionist needs, behind one entry point.
+ * The AI agents. There are two, with different users, permissions and tools:
  *
- *   routes.js      HTTP API the agent uses as its tools (/api/agent/*)
- *   tools.js       tool definitions (what the agent may do)
- *   prompt.js      persona and rules
- *   textAgent.js   turn-based agent (admin tester)
- *   liveAgent.js   real-time audio agent (website call button) over WebSocket + Gemini Live
- *   toolRunner.js  executes a tool call
- *   callRecord.js  call log: transcript, outcome, summary
+ *   guest/    The receptionist guests talk to (public website call, phone). Books and manages the caller's own bookings.
+ *   staff/    The assistant for signed-in hotel staff. Answers questions about analytics, availability, rooms, bookings...
+ *   shared/   What both use (the Gemini client).
  *
- * The agent only changes hotel data through its tools, never through the database directly.
+ * Agents change hotel data only through the same services and APIs the dashboard uses, never through the database directly.
  */
-export { default as agentRouter } from './routes.js';
-export { attachLiveAgent } from './liveAgent.js';
-export * as textAgent from './textAgent.js';
+export { default as agentRouter } from './guest/routes.js';
+export { attachLiveAgent } from './guest/liveAgent.js';
+export * as textAgent from './guest/textAgent.js';
+export { default as guestTestRoutes } from './guest/testCallRoutes.js';

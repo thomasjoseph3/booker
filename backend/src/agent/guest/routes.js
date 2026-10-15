@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import { validate } from '../middleware/validate.js';
-import { searchAvailability } from '../modules/bookings/availability.js';
-import * as svc from '../modules/bookings/service.js';
-import * as callsRepo from '../modules/calls/repository.js';
-import * as calls from '../modules/calls/service.js';
-import * as hotels from '../modules/hotels/repository.js';
-import * as rooms from '../modules/rooms/repository.js';
-import { forbidden, notFound } from '../utils/errors.js';
-import { money } from '../utils/money.js';
-import { normalizePhone } from '../utils/misc.js';
+import { validate } from '../../middleware/validate.js';
+import { searchAvailability } from '../../modules/bookings/availability.js';
+import * as svc from '../../modules/bookings/service.js';
+import * as callsRepo from '../../modules/calls/repository.js';
+import * as calls from '../../modules/calls/service.js';
+import * as hotels from '../../modules/hotels/repository.js';
+import * as rooms from '../../modules/rooms/repository.js';
+import { forbidden, notFound } from '../../utils/errors.js';
+import { money } from '../../utils/money.js';
+import { normalizePhone } from '../../utils/misc.js';
 import {
   availabilitySchema,
   callbackSchema,
@@ -17,7 +17,7 @@ import {
   callLogSchema,
   createBookingSchema,
   modifyBookingSchema,
-} from '../validation.js';
+} from '../../validation.js';
 import { requireAgent, requireHotelContext } from './auth.js';
 import { agentTools } from './tools.js';
 import { agentBookingView, hotelProfileForAgent, paymentSentence, roomTypeForAgent } from './views.js';
