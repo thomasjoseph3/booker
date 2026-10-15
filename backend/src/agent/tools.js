@@ -1,6 +1,8 @@
-// Function-calling definitions (OpenAI / Ollama "tools" format) for the voice agent.
-// `http` tells the agent runtime which endpoint implements each tool; the agent always
-// sends its x-api-key (and x-hotel-id with the master key).
+/**
+ * The agent's tools: everything it is allowed to do, in OpenAI-style function-calling format.
+ * `http` says which /api/agent endpoint implements each tool. Served publicly at GET /api/agent/tools
+ * so any external agent runtime can load them, and used by the built-in Gemini agents.
+ */
 
 const fn = (name, description, properties, required, http) => ({
   type: 'function',
@@ -59,3 +61,12 @@ export const agentTools = [
     { method: 'POST', path: '/api/agent/callbacks' },
   ),
 ];
+
+export const toolByName = Object.fromEntries(agentTools.map((t) => [t.function.name, t]));
+
+/** The same tools as Gemini `functionDeclarations` (it rejects an empty `parameters` object). */
+export const geminiFunctionDeclarations = agentTools.map(({ function: f }) => ({
+  name: f.name,
+  description: f.description,
+  ...(Object.keys(f.parameters.properties).length ? { parameters: f.parameters } : {}),
+}));

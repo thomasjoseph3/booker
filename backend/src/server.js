@@ -2,7 +2,7 @@ import { config } from './config.js';
 import { connectDb } from './db.js';
 import { createApp } from './app.js';
 import { startJobs } from './jobs.js';
-import { attachLiveAgent } from './services/liveAgent.js';
+import { attachLiveAgent } from './agent/index.js';
 
 await connectDb();
 const app = createApp();

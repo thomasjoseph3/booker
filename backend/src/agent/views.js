@@ -1,9 +1,11 @@
-import { config } from './config.js';
-import { round2 } from './utils/misc.js';
-import { todayIn } from './utils/dates.js';
+import { config } from '../config.js';
+import { todayIn } from '../utils/dates.js';
+import { money } from '../utils/money.js';
+import { round2 } from '../utils/misc.js';
 
-const money = (currency, n) => `${currency} ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+// Response shapes for the agent: compact, flat and free of internal ids it does not need.
 
+/** A booking as the agent sees it (optionally with the open payment link). */
 export function agentBookingView(b, openPayment) {
   return {
     code: b.code,
@@ -34,6 +36,7 @@ export function agentBookingView(b, openPayment) {
   };
 }
 
+/** Property facts the agent may quote: policies, amenities, FAQs, today's date at the property. */
 export function hotelProfileForAgent(h) {
   const p = h.payment || {};
   const c = h.cancellation || {};
@@ -76,6 +79,7 @@ function whereSent(booking) {
   return `to ${parts.join(' and ') || 'you'}`;
 }
 
+/** What the agent says after a payment link was sent. */
 export function paymentSentence(hotel, booking, payment) {
   if (!payment) return undefined;
   const until = booking.holdExpiresAt
@@ -83,5 +87,3 @@ export function paymentSentence(hotel, booking, payment) {
     : '';
   return `I've sent a payment link for ${money(hotel.currency, payment.amount)} ${whereSent(booking)}.${until} If the advance isn't paid by then, the room will be released. As soon as it's paid, you'll receive your confirmation and check-in details there too.`;
 }
-
-export { money };

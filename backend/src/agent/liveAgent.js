@@ -1,10 +1,13 @@
 import crypto from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
-import { agentTools } from '../agentTools.js';
 import { config } from '../config.js';
-import { CallLog, Hotel } from '../models/index.js';
+import { Hotel } from '../models/index.js';
 import { normalizePhone } from '../utils/misc.js';
-import { finishCall, log, runTool, systemPrompt } from './voiceAgent.js';
+import { appendTranscript, finishCall, openCallLog } from './callRecord.js';
+import { buildSystemPrompt } from './prompt.js';
+import { createSession } from './session.js';
+import { geminiFunctionDeclarations } from './tools.js';
+import { runTool } from './toolRunner.js';
 
 /**
  * Real-time voice calls for the public website.
@@ -19,12 +22,6 @@ import { finishCall, log, runTool, systemPrompt } from './voiceAgent.js';
  */
 
 const GEMINI_WS = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
-const declarations = agentTools.map(({ function: f }) => ({
-  name: f.name,
-  description: f.description,
-  ...(Object.keys(f.parameters.properties).length ? { parameters: f.parameters } : {}),
-}));
-
 let active = 0;
 const send = (ws, payload) => ws.readyState === WebSocket.OPEN && ws.send(typeof payload === 'string' || Buffer.isBuffer(payload) ? payload : JSON.stringify(payload));
 
@@ -62,8 +59,8 @@ async function handleCall(client, req) {
   const callerEmail = (url.searchParams.get('email') || '').trim().toLowerCase().slice(0, 120);
   const callId = `web-${crypto.randomBytes(5).toString('hex')}`;
   const greeting = hotel.agent?.greeting || `Hello, thank you for calling ${hotel.name}. How can I help you today?`;
-  const session = { callerPhone, callerEmail: /^\S+@\S+\.\S+$/.test(callerEmail) ? callerEmail : undefined, startedAt: Date.now(), tools: new Set(), bookingCodes: new Set() };
-  await CallLog.create({ hotel: hotel._id, callId, direction: 'inbound', fromNumber: callerPhone || undefined, toNumber: hotel.phoneNumbers?.[0], startedAt: new Date(), transcript: [{ role: 'system', text: 'Website call', at: new Date() }] });
+  const session = createSession({ callerPhone, callerEmail: /^\S+@\S+\.\S+$/.test(callerEmail) ? callerEmail : undefined });
+  await openCallLog(hotel, { callId, callerPhone, note: 'Website call' });
 
   const upstream = new WebSocket(`${GEMINI_WS}?key=${config.gemini.apiKey}`);
   let ready = false;
@@ -71,7 +68,7 @@ async function handleCall(client, req) {
   const pending = []; // client audio that arrived before Gemini was ready
   const turn = { role: null, text: '' }; // transcript chunks of the current speaker
   const flush = async () => {
-    if (turn.role && turn.text.trim()) await log(hotel._id, callId, [{ role: turn.role, text: turn.text.trim() }]);
+    if (turn.role && turn.text.trim()) await appendTranscript(hotel._id, callId, [{ role: turn.role, text: turn.text.trim() }]);
     turn.role = null;
     turn.text = '';
   };
@@ -109,8 +106,8 @@ async function handleCall(client, req) {
           temperature: 0.7,
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
         },
-        systemInstruction: { parts: [{ text: systemPrompt(hotel, callerPhone, session.callerEmail) }] },
-        tools: [{ functionDeclarations: declarations }],
+        systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
+        tools: [{ functionDeclarations: geminiFunctionDeclarations }],
         inputAudioTranscription: {},
         outputAudioTranscription: {},
       },
@@ -144,7 +141,7 @@ async function handleCall(client, req) {
       for (const fc of m.toolCall.functionCalls) {
         const result = await runTool(session, hotel, callId, fc.name, fc.args || {});
         send(client, { type: 'tool', name: fc.name, ok: !result.error });
-        await log(hotel._id, callId, [{ role: 'tool', text: `${fc.name}(${JSON.stringify(fc.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}` }]);
+        await appendTranscript(hotel._id, callId, [{ role: 'tool', text: `${fc.name}(${JSON.stringify(fc.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}` }]);
         functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
       }
       upstream.send(JSON.stringify({ toolResponse: { functionResponses } }));

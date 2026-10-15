@@ -1,16 +1,18 @@
 import { Router } from 'express';
-import { agentTools } from '../agentTools.js';
-import { requireAgent, requireHotelContext } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { Booking, Callback, CallLog, Guest, Hotel, RoomType } from '../models/index.js';
 import * as svc from '../services/bookings.js';
-import { agentBookingView, hotelProfileForAgent, money, paymentSentence } from '../serializers.js';
 import { forbidden, notFound } from '../utils/errors.js';
+import { money } from '../utils/money.js';
 import { normalizePhone } from '../utils/misc.js';
 import {
   availabilitySchema, callbackSchema, callerLookupSchema, callerSchema, callLogSchema, createBookingSchema, modifyBookingSchema,
 } from '../validation.js';
+import { requireAgent, requireHotelContext } from './auth.js';
+import { agentTools } from './tools.js';
+import { agentBookingView, hotelProfileForAgent, paymentSentence } from './views.js';
 
+/** The HTTP API the agent calls as its tools. Mounted at /api/agent. */
 const router = Router();
 
 // Tool definitions are public so the agent runtime can load them at boot.

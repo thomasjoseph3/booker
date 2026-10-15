@@ -7,7 +7,7 @@ import {
 } from '../../models/index.js';
 import { setStopSell } from '../../services/inventory.js';
 import * as svc from '../../services/bookings.js';
-import * as voice from '../../services/voiceAgent.js';
+import { textAgent } from '../../agent/index.js';
 import { addDays, nightsBetween, todayIn } from '../../utils/dates.js';
 import { badRequest, conflict, notFound } from '../../utils/errors.js';
 import { escapeRegex, round2 } from '../../utils/misc.js';
@@ -35,13 +35,13 @@ async function paginate(model, filter, q, { sort = { createdAt: -1 }, populate, 
 // ---------- browser test call (voice agent) ----------
 
 router.post('/voice/start', validate(z.object({ callerPhone: z.string().min(5), callerEmail: z.union([z.email(), z.literal('')]).optional() })), async (req, res) => {
-  res.status(201).json(await voice.startCall(req.hotel, req.body));
+  res.status(201).json(await textAgent.startCall(req.hotel, req.body));
 });
 router.post('/voice/turn', validate(z.object({ callId: z.string(), text: z.string().trim().min(1).max(1000) })), async (req, res) => {
-  res.json(await voice.agentTurn(req.hotel, req.body.callId, req.body.text));
+  res.json(await textAgent.agentTurn(req.hotel, req.body.callId, req.body.text));
 });
 router.post('/voice/end', validate(z.object({ callId: z.string() })), async (req, res) => {
-  res.json(await voice.endCall(req.hotel, req.body.callId));
+  res.json(await textAgent.endCall(req.hotel, req.body.callId));
 });
 
 // ---------- dashboard ----------

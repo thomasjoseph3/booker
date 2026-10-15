@@ -5,7 +5,7 @@ import morgan from 'morgan';
 import { config } from './config.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import adminRouter from './routes/admin/index.js';
-import agentRouter from './routes/agent.js';
+import { agentRouter } from './agent/index.js';
 import publicRouter from './routes/public.js';
 import { payPagesRouter, webhookRouter } from './routes/payments.js';
 
