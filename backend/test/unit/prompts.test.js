@@ -106,3 +106,17 @@ describe('staff assistant data shapes', () => {
     assert.equal(room.currentGuest, 'Asha (BK1, out 2026-10-18)');
   });
 });
+
+describe('language matching', () => {
+  it('tells the receptionist to follow the caller between Malayalam, English and a mix', () => {
+    const p = buildSystemPrompt(hotel, {});
+    assert.match(p, /Malayalam in, Malayalam out/);
+    assert.match(p, /switch language during the call, switch with them/);
+    assert.match(p, /Do not ask which language/);
+    assert.match(p, /booking codes and email addresses letter by letter/);
+  });
+
+  it('tells the staff assistant to answer in the language of the question', () => {
+    assert.match(buildStaffPrompt(hotel, { name: 'Anu', role: 'staff' }), /language of the person's latest message/);
+  });
+});

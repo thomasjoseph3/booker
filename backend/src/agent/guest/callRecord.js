@@ -21,8 +21,9 @@ const SUMMARY_SCHEMA = {
     summary: { type: 'string', description: 'One or two sentences' },
     intent: { type: 'string', description: 'Short label, e.g. new booking, cancellation, room enquiry' },
     sentiment: { type: 'string', enum: ['positive', 'neutral', 'negative'] },
+    language: { type: 'string', description: 'Main language the caller spoke: English, Malayalam, Hindi, ... or Mixed' },
   },
-  required: ['summary', 'intent', 'sentiment'],
+  required: ['summary', 'intent', 'sentiment', 'language'],
 };
 
 /** Creates the call record when a call connects. */
@@ -66,7 +67,16 @@ async function summarize(transcript) {
     .join('\n');
   try {
     const data = await generateContent({
-      contents: [{ role: 'user', parts: [{ text: `Summarise this hotel phone call.\n\n${text}` }] }],
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `Summarise this hotel phone call. Write the summary and intent in English even if the call was in another language, and report the language the caller spoke.\n\n${text}`,
+            },
+          ],
+        },
+      ],
       generationConfig: { responseMimeType: 'application/json', responseSchema: SUMMARY_SCHEMA },
     });
     const result = JSON.parse(data.candidates[0].content.parts[0].text);

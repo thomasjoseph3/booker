@@ -61,6 +61,7 @@ async function CallContent({ params }: PageProps<"/h/[hotelId]/calls/[callId]">)
               <div className="flex justify-between gap-2"><dt className="text-muted">Outcome</dt><dd><Badge value={call.outcome} /></dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Intent</dt><dd className="capitalize">{label(call.intent) || "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Sentiment</dt><dd><Badge value={call.sentiment} /></dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-muted">Language</dt><dd>{call.language ?? "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Dialed</dt><dd>{call.toNumber ?? "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Channel</dt><dd>{label(call.channel) || "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-muted">Model</dt><dd className="truncate font-mono text-xs">{call.model ?? "—"}</dd></div>

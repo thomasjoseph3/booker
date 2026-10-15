@@ -102,6 +102,7 @@ export async function analytics(hotel, days) {
       total: totalCalls,
       byOutcome: outcome,
       bySentiment: Object.fromEntries(c.bySentiment.map((o) => [o._id || 'unknown', o.n])),
+      byLanguage: Object.fromEntries(c.byLanguage.map((o) => [o._id, o.n])),
       avgDurationSec: Math.round(c.duration[0]?.avg || 0),
       totalTalkMinutes: Math.round((c.duration[0]?.total || 0) / 60),
       bookingConversion: totalCalls ? Math.round(((outcome.booked || 0) / totalCalls) * 100) : 0,

@@ -124,7 +124,20 @@ SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / EMAIL_FROM
 
 Run: `npm run dev` in `backend/`, `admin/` and `site/` (MongoDB must be running; `npm run seed` in `backend/`).
 
-## 7. Known limits of the current setup
+## 7. Language
+
+The agent answers in the language the caller is speaking, and follows them if they switch (Malayalam, English, or the
+Malayalam-English mix many callers use). Gemini Live hears the caller's audio directly, so no language setting is needed
+and the output language is deliberately not forced. The rules live in `agent/shared/language.js` and are used by both
+agents' prompts; the staff assistant also answers typed Malayalam in Malayalam, and its dictation button has an EN/മല switch.
+
+- The greeting is fixed text per property (`hotel.agent.greeting`), because the agent cannot know the language before the caller speaks.
+- Exact things stay clear in any language: booking codes and email addresses are read letter by letter, phone numbers digit by digit, and tool arguments keep their required formats.
+- Each call log stores the main language spoken (English, Malayalam, Mixed, ...) and an English summary, so staff can read it. Analytics shows caller languages.
+- The live transcript of a Malayalam caller is produced by the speech model in romanised form (for example "enikku naala rathrikku..."); the agent's own replies are transcribed in Malayalam script.
+- Verified with real spoken Malayalam (Gemini text-to-speech fed into a live call): the agent answered in Malayalam, then switched to English when the caller did.
+
+## 8. Known limits of the current setup
 
 - Gemini Live models are **preview**; behaviour and quotas can change. A free key has low rate limits.
 - `/api/live` is public (guests need it). Before launch: per-IP rate limiting, allowed origins, and abuse limits.
@@ -133,7 +146,7 @@ Run: `npm run dev` in `backend/`, `admin/` and `site/` (MongoDB must be running;
 - No real phone number yet.
 - Room images are not in the seed data, so the site shows gradients.
 
-## 8. Possible upgrades
+## 9. Possible upgrades
 
 - **Phone calls:** a telephony provider (Twilio, Exotel, Plivo) streaming call audio into the same relay, or
   LiveKit SIP.

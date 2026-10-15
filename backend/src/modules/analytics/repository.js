@@ -62,6 +62,7 @@ export async function analyticsQueries({ hotelId: h, timezone: tz, since, pastNi
           total: [{ $count: 'n' }],
           byOutcome: [{ $group: { _id: '$outcome', n: { $sum: 1 } } }],
           bySentiment: [{ $group: { _id: '$sentiment', n: { $sum: 1 } } }],
+          byLanguage: [{ $match: { language: { $nin: [null, ''] } } }, { $group: { _id: '$language', n: { $sum: 1 } } }],
           duration: [
             { $match: { durationSec: { $gt: 0 } } },
             { $group: { _id: null, avg: { $avg: '$durationSec' }, total: { $sum: '$durationSec' } } },

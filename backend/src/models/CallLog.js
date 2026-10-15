@@ -19,6 +19,7 @@ const callLogSchema = new Schema(
     ],
     channel: { type: String, enum: ['web_live', 'phone'] }, // how the call reached the agent
     model: String, // the AI model that handled it
+    language: String, // main language the caller spoke (English, Malayalam, Mixed, ...)
     summary: String,
     intent: String,
     outcome: { type: String, enum: ['booked', 'cancelled', 'modified', 'inquiry', 'callback_requested', 'abandoned', 'other'] },

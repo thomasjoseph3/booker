@@ -37,6 +37,7 @@ export function AssistantClient({ hotelId, initialChats, canSeeAll, meId }: { ho
   const [showHistory, setShowHistory] = useState(false);
   const [listening, setListening] = useState(false);
   const [speak, setSpeak] = useState(false);
+  const [dictationLang, setDictationLang] = useState<"en-IN" | "ml-IN">("en-IN");
   const scroller = useRef<HTMLDivElement>(null);
   const recognition = useRef<Recognition | null>(null);
 
@@ -99,7 +100,7 @@ export function AssistantClient({ hotelId, initialChats, canSeeAll, meId }: { ho
     if (!Ctor) return setError("This browser has no speech recognition. Use Chrome or Edge, or type your question.");
     if (listening) return recognition.current?.stop();
     const r = new Ctor();
-    r.lang = "en-IN";
+    r.lang = dictationLang;
     r.interimResults = true;
     r.onresult = (e) => setText(Array.from(e.results).map((x) => x[0].transcript).join(" "));
     r.onend = () => setListening(false);
@@ -155,7 +156,7 @@ export function AssistantClient({ hotelId, initialChats, canSeeAll, meId }: { ho
           {messages.length === 0 && (
             <div className="mx-auto max-w-lg pt-6 text-center sm:pt-12">
               <p className="text-lg font-medium">What would you like to know?</p>
-              <p className="mt-1 text-muted">I can look up live data for this property. I can&apos;t change anything, only report.</p>
+              <p className="mt-1 text-muted">I can look up live data for this property. Ask in English or Malayalam. I can&apos;t change anything, only report.</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((s) => <button key={s} onClick={() => send(s)} className="rounded-full border border-line bg-panel px-3 py-1.5 text-left text-sm text-ink-2 hover:bg-panel-2">{s}</button>)}
               </div>
@@ -175,6 +176,10 @@ export function AssistantClient({ hotelId, initialChats, canSeeAll, meId }: { ho
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(text); } }}
           />
+          <select aria-label="Dictation language" value={dictationLang} onChange={(e) => setDictationLang(e.target.value as "en-IN" | "ml-IN")} className={clsx(inputClass, "!w-auto !px-2")}>
+            <option value="en-IN">EN</option>
+            <option value="ml-IN">മല</option>
+          </select>
           <button type="button" onClick={dictate} aria-pressed={listening} title="Dictate" className={buttonClass("secondary", clsx("!px-3", listening && "!bg-accent !text-accent-ink"))}>🎙</button>
           <button type="button" onClick={() => setSpeak((v) => !v)} aria-pressed={speak} title="Read answers aloud" className={buttonClass("secondary", clsx("hidden !px-3 sm:inline-flex", speak && "!bg-accent !text-accent-ink"))}>🔊</button>
           <button className={buttonClass("primary")} disabled={busy || readOnly || !text.trim()}>Send</button>

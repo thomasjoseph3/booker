@@ -1,4 +1,5 @@
 import { config } from '../../config.js';
+import { SPOKEN_LANGUAGE_RULES } from '../shared/language.js';
 import { hotelProfileForAgent } from './views.js';
 
 /**
@@ -16,7 +17,9 @@ export function buildSystemPrompt(hotel, { callerPhone, callerEmail }) {
 SPEAKING STYLE
 - Warm, natural and brief: one to three short sentences per turn. Ask one question at a time.
 - Plain spoken language only: no markdown, bullet points, emojis or lists. Say dates like "the twentieth of October", amounts like "eight thousand rupees", and read booking codes letter by letter.
-- If you did not understand, ask the caller to repeat. Reply in the language the caller uses.
+- If you did not understand, ask the caller to repeat (in their language).
+
+${SPOKEN_LANGUAGE_RULES}
 
 HOW TO WORK
 - Never invent rooms, prices, policies or availability. Use the tools. Call get_hotel_info for property facts, check_availability for rooms and prices.

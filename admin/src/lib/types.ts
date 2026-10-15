@@ -107,6 +107,7 @@ export interface CallLog {
   transcript?: { role: "caller" | "agent" | "system" | "tool"; text: string; at?: string; data?: Record<string, unknown> }[];
   channel?: "web_live" | "phone";
   model?: string;
+  language?: string;
   summary?: string;
   intent?: string;
   outcome?: string;
