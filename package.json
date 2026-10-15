@@ -1,0 +1,18 @@
+{
+  "name": "hotel-agent",
+  "private": true,
+  "description": "Hotel booking platform: Express + MongoDB API and Next.js admin dashboard",
+  "scripts": {
+    "setup": "npm install && npm --prefix backend install && npm --prefix admin install && node scripts/init-env.mjs",
+    "seed": "npm --prefix backend run seed",
+    "dev": "concurrently -k -n api,admin -c blue,magenta \"npm --prefix backend run dev\" \"npm --prefix admin run dev\"",
+    "build": "npm --prefix admin run build",
+    "start": "concurrently -k -n api,admin -c blue,magenta \"npm --prefix backend start\" \"npm --prefix admin start\"",
+    "test": "npm --prefix backend run smoke",
+    "check": "node backend/scripts/check-data.js",
+    "demo:call": "npm --prefix backend run demo:call --"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4"
+  }
+}

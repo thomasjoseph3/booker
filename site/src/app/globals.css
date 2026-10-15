@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fbf8f3;
+  --card: #ffffff;
+  --ink: #1d2a24;
+  --ink-2: #4b5a52;
+  --muted: #7a877f;
+  --line: #e8e2d6;
+  --brand: #1f5c46;
+  --brand-ink: #ffffff;
+  --brand-soft: #e3efe8;
+  --gold: #b88a3e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101612;
+    --card: #17201a;
+    --ink: #eef2ee;
+    --ink-2: #bdc9c1;
+    --muted: #8a978f;
+    --line: #26312a;
+    --brand: #4fae88;
+    --brand-ink: #08150f;
+    --brand-soft: #16281f;
+    --gold: #d6a75a;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-gold: var(--gold);
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-serif-display);
+}
+
+body { background: var(--bg); color: var(--ink); }
+
+@keyframes ring { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(2.2); opacity: 0; } }
+.ring { animation: ring 2s ease-out infinite; }
