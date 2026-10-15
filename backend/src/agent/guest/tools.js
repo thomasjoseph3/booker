@@ -114,6 +114,17 @@ export const guestToolSpecs = [
   ),
 ];
 
+/**
+ * Call control, handled by the live call itself rather than by an HTTP endpoint (so it is not in the public tool list).
+ * The model calls it after it has said goodbye; liveAgent.js then hangs up once that last turn has finished playing.
+ */
+export const endCallSpec = spec(
+  'end_call',
+  'Hang up the call. Use it only when everything is done, you have asked whether there is anything else, and the caller said no or said goodbye. Say your goodbye first, then call this. Never use it while the caller still has a question or a booking is half done.',
+  z.object({}),
+  null,
+);
+
 export const guestToolSpecByName = Object.fromEntries(guestToolSpecs.map((s) => [s.name, s]));
 
 /** OpenAI-style definitions served at GET /api/agent/tools, for agent runtimes outside this codebase. */

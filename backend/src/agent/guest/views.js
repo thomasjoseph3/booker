@@ -1,5 +1,5 @@
 import { config } from '../../config.js';
-import { todayIn } from '../../utils/dates.js';
+import { todayIn, upcomingDays } from '../../utils/dates.js';
 import { money } from '../../utils/money.js';
 import { round2 } from '../../utils/misc.js';
 
@@ -57,6 +57,7 @@ export function hotelProfileForAgent(h) {
     contact: h.contact,
     timezone: h.timezone,
     todayAtProperty: todayIn(h.timezone),
+    nextDays: upcomingDays(h.timezone),
     currency: h.currency,
     checkInTime: h.checkInTime,
     checkOutTime: h.checkOutTime,
@@ -80,12 +81,15 @@ function whereSent(booking) {
   return `to ${parts.join(' and ') || 'you'}`;
 }
 
+/** Appended to what the agent says after a booking action, so it asks before the call is ended. */
+export const ASK_ANYTHING_ELSE = 'Then ask once whether there is anything else you can help with, or whether you can end the call.';
+
 /** What the agent says after a payment link was sent. */
 export function paymentSentence(hotel, booking, payment) {
   if (!payment) return undefined;
   const minutes = booking.holdExpiresAt ? Math.max(1, Math.round((new Date(booking.holdExpiresAt) - Date.now()) / 60000)) : 0;
   const until = minutes ? ` Your room is held for you for the next ${minutes} minutes. Say the number of minutes, not a clock time.` : '';
-  return `I've sent a payment link for ${money(hotel.currency, payment.amount)} ${whereSent(booking)}.${until} If the advance isn't paid by then, the room will be released. As soon as it's paid, you'll receive your confirmation and check-in details there too.`;
+  return `I've sent a payment link for ${money(hotel.currency, payment.amount)} ${whereSent(booking)}.${until} If the advance isn't paid by then, the room will be released. As soon as it's paid, you'll receive your confirmation and check-in details there too. Say the room is held (not yet confirmed) until the advance is paid. ${ASK_ANYTHING_ELSE}`;
 }
 
 const INTERNAL_FIELDS = ['hotel', '__v', 'createdAt', 'updatedAt'];

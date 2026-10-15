@@ -57,3 +57,14 @@ export function zonedToUtc(day, time, timeZone) {
   const asLocal = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
   return new Date(guess - (asLocal - guess));
 }
+
+/** The next `days` calendar days from today at the property, e.g. "Thu 2026-10-15 (today)". Models are poor at weekday arithmetic, so the agent is given this list. */
+export function upcomingDays(timeZone, days = 21) {
+  const today = todayIn(timeZone);
+  const [y, m, d] = today.split('-').map(Number);
+  return Array.from({ length: days }, (_, i) => {
+    const day = new Date(Date.UTC(y, m - 1, d + i));
+    const label = day.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+    return `${label} ${day.toISOString().slice(0, 10)}${i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : ''}`;
+  });
+}

@@ -40,6 +40,9 @@ export function attachLiveAgent(server) {
   return wss;
 }
 
+/** Tools that change a booking: the call is paused (mic not forwarded) while they run. */
+const WRITE_TOOLS = new Set(['create_booking', 'modify_booking', 'cancel_booking', 'resend_payment_link']);
+
 async function handleCall(client, req) {
   const url = new URL(req.url, 'http://x');
   const hotelRef = (url.searchParams.get('hotel') || '').toLowerCase();
@@ -70,10 +73,18 @@ async function handleCall(client, req) {
   let upstream;
   let ready = false;
   let ended = false;
+  let busy = false; // a booking change is running: the caller's audio is dropped so nothing interrupts it
+  let closing = false; // the agent said goodbye and asked to hang up: end the call when its last turn is done
   const pending = []; // client audio that arrived before Gemini was ready
   const turn = { role: null, text: '' }; // transcript chunks of the current speaker
+  let lastSaved = {};
   const flush = async () => {
-    if (turn.role && turn.text.trim()) await appendTranscript(hotel._id, callId, [{ role: turn.role, text: turn.text.trim() }]);
+    const text = turn.text.trim();
+    // Gemini sometimes sends the same transcript twice; keep one
+    if (turn.role && text && !(turn.role === lastSaved.role && text === lastSaved.text)) {
+      await appendTranscript(hotel._id, callId, [{ role: turn.role, text }]);
+      lastSaved = { role: turn.role, text };
+    }
     turn.role = null;
     turn.text = '';
   };
@@ -152,15 +163,28 @@ async function handleCall(client, req) {
         }
         if (sc.inputTranscription?.text) await addText('caller', sc.inputTranscription.text);
         if (sc.outputTranscription?.text) await addText('agent', sc.outputTranscription.text);
-        if (sc.turnComplete) await flush();
+        if (sc.turnComplete) {
+          await flush();
+          if (closing) void end('agent_hangup');
+        }
       }
       if (m.toolCall?.functionCalls?.length) {
         const functionResponses = [];
+        busy = m.toolCall.functionCalls.some((fc) => WRITE_TOOLS.has(fc.name));
+        if (busy) send(client, { type: 'busy', on: true });
         for (const fc of m.toolCall.functionCalls) {
           await flush(); // keep the transcript in spoken order: what was said before the tool ran comes first
           const result = await invokeGuestTool(guestTools, fc.name, fc.args);
           send(client, { type: 'tool', name: fc.name, ok: !result.error });
+          if (fc.name === 'end_call' && !closing) {
+            closing = true;
+            setTimeout(() => void end('agent_hangup'), 8000); // in case no further turn completes
+          }
           functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
+        }
+        if (busy) {
+          busy = false;
+          send(client, { type: 'busy', on: false });
         }
         ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
       }
@@ -204,7 +228,7 @@ async function handleCall(client, req) {
   client.on('message', (data, isBinary) => {
     if (isBinary) {
       if (!ready) pending.length < 200 && pending.push(data);
-      else if (upstream.readyState === WebSocket.OPEN) sendAudio(data);
+      else if (!busy && upstream.readyState === WebSocket.OPEN) sendAudio(data);
       return;
     }
     try {

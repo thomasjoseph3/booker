@@ -9,6 +9,7 @@ export type CallEvent =
   | { type: "transcript"; role: "caller" | "agent"; text: string }
   | { type: "tool"; name: string; ok: boolean }
   | { type: "interrupt" }
+  | { type: "busy"; on: boolean }
   | { type: "ended"; summary?: string; outcome?: string; durationSec?: number }
   | { type: "error"; message: string };
 
@@ -97,7 +98,7 @@ export class LiveCall {
         const ev = JSON.parse(e.data) as CallEvent;
         if (ev.type === "interrupt") this.flushPlayback();
         this.onEvent(ev);
-        if (ev.type === "ended" || ev.type === "error") this.teardown();
+        if (ev.type === "ended" || ev.type === "error") this.teardown(ev.type === "ended");
       } else this.play(e.data as ArrayBuffer);
     };
     ws.onclose = () => { if (!this.closed) { this.teardown(); this.onEvent({ type: "ended" }); } };
@@ -106,7 +107,7 @@ export class LiveCall {
 
   sendText(text: string) { this.ws?.send(JSON.stringify({ type: "text", text })); }
   setMuted(m: boolean) { this.muted = m; }
-  hangUp() { if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: "end" })); else this.teardown(); }
+  hangUp() { this.flushPlayback(); if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type: "end" })); else this.teardown(); }
 
   private play(buf: ArrayBuffer) {
     const ctx = this.outCtx;
@@ -131,12 +132,19 @@ export class LiveCall {
     this.playhead = 0;
   }
 
-  private teardown() {
+  /** `drain`: let the agent finish its last sentence (the server hung up after its goodbye) before closing the audio. */
+  private teardown(drain = false) {
     this.closed = true;
-    this.flushPlayback();
+    this.muted = true;
     this.mic?.getTracks().forEach((t) => t.stop());
     void this.inCtx?.close().catch(() => {});
-    void this.outCtx?.close().catch(() => {});
-    this.ws?.close();
+    const finish = () => {
+      this.flushPlayback();
+      void this.outCtx?.close().catch(() => {});
+      this.ws?.close();
+    };
+    const wait = drain && this.outCtx ? Math.min(10, Math.max(0, this.playhead - this.outCtx.currentTime)) : 0;
+    if (wait > 0) setTimeout(finish, wait * 1000 + 250);
+    else finish();
   }
 }

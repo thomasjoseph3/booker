@@ -20,7 +20,7 @@ import {
 } from '../../validation.js';
 import { requireAgent, requireHotelContext } from './auth.js';
 import { agentTools } from './tools.js';
-import { agentBookingView, hotelProfileForAgent, paymentSentence, roomTypeForAgent } from './views.js';
+import { agentBookingView, ASK_ANYTHING_ELSE, hotelProfileForAgent, paymentSentence, roomTypeForAgent } from './views.js';
 
 /** The HTTP API the agent calls as its tools. Mounted at /api/agent. */
 const router = Router();
@@ -64,7 +64,7 @@ router.post('/bookings', validate(createBookingSchema), async (req, res) => {
   }
   const sayNext =
     booking.status === 'confirmed'
-      ? `Booking ${booking.code} is confirmed. Total ${money(booking.currency, booking.total)}, payable at the hotel.`
+      ? `Booking ${booking.code} is confirmed. Total ${money(booking.currency, booking.total)}, payable at the hotel. ${ASK_ANYTHING_ELSE}`
       : paymentError
         ? `The room is on hold as ${booking.code}, but the payment link could not be sent (${paymentError}). Try resending the payment link, or offer a callback from staff.`
         : paymentSentence(req.hotel, booking, payment);

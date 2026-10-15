@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { config } from '../../config.js';
 import { appendTranscript } from './callRecord.js';
-import { guestToolSpecs } from './tools.js';
+import { endCallSpec, guestToolSpecs } from './tools.js';
 
 const MAX_LOGGED_RESULT = 3000;
 
@@ -58,11 +58,14 @@ async function callAgentApi(spec, { session, hotel, callId }, args, fetchImpl) {
  * `log` and `fetch` can be replaced (the tests do).
  */
 export function buildGuestTools(ctx, { log = appendTranscript, fetch: fetchImpl = globalThis.fetch } = {}) {
-  return guestToolSpecs.map((spec) =>
+  return [...guestToolSpecs, endCallSpec].map((spec) =>
     tool(
       async (args) => {
         const started = Date.now();
-        const result = await callAgentApi(spec, ctx, args, fetchImpl);
+        const result =
+          spec === endCallSpec
+            ? { ok: true, note: 'The call ends now. Do not say anything more.' }
+            : await callAgentApi(spec, ctx, args, fetchImpl);
         const ms = Date.now() - started;
         const text = JSON.stringify(result);
         await log(ctx.hotel._id, ctx.callId, [

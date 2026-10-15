@@ -18,6 +18,7 @@ export function CallDialog({ slug, hotelName, onClose }: { slug: string; hotelNa
   const [muted, setMuted] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [tool, setTool] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const call = useRef<LiveCall | null>(null);
   const orb = useRef<HTMLDivElement>(null);
@@ -34,11 +35,14 @@ export function CallDialog({ slug, hotelName, onClose }: { slug: string; hotelNa
     } else if (e.type === "tool") {
       setTool(e.name);
       setTimeout(() => setTool(null), 2500);
+    } else if (e.type === "busy") {
+      setBusy(e.on);
     } else if (e.type === "error") {
       setError(e.message);
       setPhase((p) => (p === "live" ? "ended" : "form"));
     } else if (e.type === "ended") {
       setSummary(e.summary ?? null);
+      setBusy(false);
       setPhase("ended");
     }
   }, []);
@@ -139,7 +143,7 @@ export function CallDialog({ slug, hotelName, onClose }: { slug: string; hotelNa
               ))}
               {phase === "live" && lines.length === 0 && <p className="text-sm text-white/50">Say hello…</p>}
             </div>
-            <p className="h-6 text-center text-xs text-[#7ff0bd]">{tool ? `⚙ ${tool.replaceAll("_", " ")}…` : ""}</p>
+            <p className="h-6 text-center text-xs text-[#7ff0bd]">{busy ? "Booking in progress — please hold on a moment…" : tool ? `⚙ ${tool.replaceAll("_", " ")}…` : ""}</p>
             <div className="flex items-center justify-center gap-5 p-6 pt-2">
               <button onClick={() => { const m = !muted; setMuted(m); call.current?.setMuted(m); }} disabled={phase !== "live"} aria-pressed={muted}
                 className={clsx("grid size-14 place-items-center rounded-full text-xl transition disabled:opacity-40", muted ? "bg-white text-black" : "bg-white/12 hover:bg-white/20")} title={muted ? "Unmute" : "Mute"}>{muted ? "🔇" : "🎙"}</button>

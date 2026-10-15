@@ -65,7 +65,7 @@ async function summarize(transcript, makeModels = () => createModels({ temperatu
     const structured = (model) => model.withStructuredOutput(SummarySchema);
     const model = structured(models.primary).withFallbacks(models.fallbacks.map(structured));
     const result = await model.invoke(
-      'Summarise this hotel phone call. Write the summary and intent in English even if the call was in another language, and report the language the caller spoke. ' +
+      'Summarise this hotel phone call. Write the summary and intent in English even if the call was in another language, and report the language the caller mainly spoke. The caller lines are machine transcribed, so stray words from other languages (Spanish, German, ...) are transcription mistakes: judge the language from the whole call and from how the agent replied, and use Mixed only when the caller really mixed languages. ' +
         'Only state what the transcript and the [tool] lines show: say a booking was made or a payment link sent only if a create_booking tool succeeded, and say what was still pending otherwise.' +
         `\n\n${text}`,
     );

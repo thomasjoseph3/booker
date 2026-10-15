@@ -42,3 +42,15 @@ describe('dates', () => {
     assert.equal(zonedToUtc('2026-01-01', '09:00', 'America/New_York').toISOString(), '2026-01-01T14:00:00.000Z'); // EST
   });
 });
+
+describe('upcomingDays', () => {
+  it('lists the next days with their weekday, marking today and tomorrow', async () => {
+    const { upcomingDays } = await import('../../src/utils/dates.js');
+    const days = upcomingDays('Asia/Kolkata', 10);
+    assert.equal(days.length, 10);
+    assert.match(days[0], /^[A-Z][a-z]{2} \d{4}-\d{2}-\d{2} \(today\)$/);
+    assert.match(days[1], /\(tomorrow\)$/);
+    const monday = days.find((d) => d.startsWith('Mon'));
+    assert.ok(monday && new Date(monday.slice(4, 14)).getUTCDay() === 1);
+  });
+});
