@@ -63,13 +63,13 @@ describe('what the guest agent says', () => {
     assert.match(full.paymentPolicy, /pay entirely at the hotel/);
   });
 
-  it('tells the caller where the payment link went, and until when the room is held', () => {
+  it('tells the caller where the payment link went, and for how long the room is held', () => {
     const payment = { amount: 3000 };
-    const held = { ...booking, holdExpiresAt: new Date('2026-10-15T07:00:00Z') };
+    const held = { ...booking, holdExpiresAt: new Date(Date.now() + 30 * 60000) };
     config.guestChannels = ['email'];
     const email = paymentSentence(hotel, held, payment);
     assert.match(email, /INR 3,000 to your email at asha@example\.com/);
-    assert.match(email, /held for you until 12:30 pm/i);
+    assert.match(email, /held for you for the next 30 minutes/i);
     config.guestChannels = ['whatsapp'];
     assert.match(paymentSentence(hotel, held, payment), /your WhatsApp at \+919847012345/);
     assert.equal(paymentSentence(hotel, held, null), undefined);

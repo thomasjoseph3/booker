@@ -97,7 +97,7 @@ do is recorded (guest calls in the call log, staff chats in `modules/conversatio
 - **Tools:** one zod schema per tool drives validation, the public tool list and the Gemini declarations (`shared/schema.js`
   strips what providers reject). Tools are built per call or conversation, so they carry their own context.
 - **Model layer:** `shared/model.js` is the only file that knows the provider (Gemini via `@langchain/google-genai`). A primary
-  model plus fallbacks (`GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`) handle the small free-tier quotas; switching provider is a change there.
+  model plus fallbacks (`GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS`) and extra API keys (`GEMINI_API_KEY_2` to `_10`, rotated by `agent/shared/keys.js`; a voice call retries on the next key if one is out of quota) handle the small free-tier quotas; switching provider is a change there.
 - **Staff assistant:** `createAgent` with `modelFallbackMiddleware` and `modelCallLimitMiddleware`. The stored conversation is the source
   of truth for context, so chats survive restarts and work across several server instances.
 - **Summaries:** `model.withStructuredOutput(zod schema)`, grounded in the tool log so a summary never claims a booking that was not made.

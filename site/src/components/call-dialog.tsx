@@ -110,12 +110,12 @@ export function CallDialog({ slug, hotelName, onClose }: { slug: string; hotelNa
           <form className="space-y-4 p-8 pt-4" onSubmit={(e) => { e.preventDefault(); void start(); }}>
             <p className="text-center text-sm text-white/70">Talk to our reservations assistant. It can check availability, book your stay and email you the payment link.</p>
             <label className="block text-sm">
-              <span className="text-white/70">Your mobile number <span className="text-white/40">(optional)</span></span>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+91 98765 43210" className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:border-white/50" />
+              <span className="text-white/70">Your mobile number</span>
+              <input required value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+91 98765 43210" autoComplete="tel" className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:border-white/50" />
             </label>
             <label className="block text-sm">
-              <span className="text-white/70">Email for your confirmation <span className="text-white/40">(optional)</span></span>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:border-white/50" />
+              <span className="text-white/70">Email for your confirmation</span>
+              <input required value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@example.com" className="mt-1 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 outline-none placeholder:text-white/30 focus:border-white/50" />
             </label>
             {error && <p className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-100">{error}</p>}
             <button className="flex w-full items-center justify-center gap-2 rounded-full bg-[#3ecf8e] py-3.5 font-medium text-[#06281a] transition hover:brightness-110">📞 Start call</button>

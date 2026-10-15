@@ -1,4 +1,5 @@
 import express, { Router } from 'express';
+import { config } from '../../config.js';
 import { notFound } from '../../utils/errors.js';
 import { money } from '../../utils/money.js';
 import { handlePaymentExpired, handlePaymentSuccess } from '../bookings/service.js';
@@ -56,17 +57,33 @@ payPagesRouter.get('/mock/:id', async (req, res) => {
 payPagesRouter.post('/mock/:id', async (req, res) => {
   const { payment } = await loadMockCheckout(req.params.id);
   await handlePaymentSuccess({ paymentId: payment._id, providerPaymentId: `mock_pay_${Date.now()}` });
-  res.redirect(303, '/pay/return?status=success');
+  res.redirect(303, `/pay/return?status=success&p=${payment._id}`);
 });
 
-payPagesRouter.get('/return', (req, res) => {
+payPagesRouter.get('/return', async (req, res) => {
   const ok = req.query.status !== 'cancelled';
+  if (!ok) {
+    return res.send(
+      page(
+        'Payment',
+        '<h1>Payment not completed</h1><p class="muted">You can use the same link again before it expires, or call the hotel for a new one.</p>',
+      ),
+    );
+  }
+  // Show what was booked so the guest sees it right away (the confirmation message follows)
+  const checkout = await loadMockCheckout(String(req.query.p ?? '')).catch(() => null);
+  const via = config.guestChannels.map((c) => (c === 'email' ? 'email' : 'WhatsApp')).join(' and ') || 'message';
+  const details = checkout
+    ? `<div class="row"><span>Booking</span><b>${esc(checkout.booking.code)}</b></div>
+<div class="row"><span>${esc(checkout.booking.roomsCount)} × ${esc(checkout.booking.roomTypeName)}</span><span>${esc(checkout.booking.nights)} night(s)</span></div>
+<div class="row"><span>${esc(checkout.booking.checkIn)} → ${esc(checkout.booking.checkOut)}</span><span></span></div>
+<div class="row"><span>Paid</span><span>${esc(money(checkout.payment.currency, checkout.payment.amount))}</span></div>
+<div class="row"><span>Confirmation sent to</span><span>${esc(checkout.booking.guestEmail || checkout.booking.guestPhone)}</span></div>`
+    : '';
   res.send(
     page(
       'Payment',
-      ok
-        ? '<h1>Payment received ✓</h1><p class="muted">Thank you! Your booking confirmation will arrive by SMS shortly.</p>'
-        : '<h1>Payment not completed</h1><p class="muted">You can use the same link again before it expires, or call the hotel for a new one.</p>',
+      `<h1>Payment received ✓</h1><p class="muted">Thank you! Your booking is confirmed. A confirmation will arrive by ${esc(via)} shortly.</p>${details}`,
     ),
   );
 });

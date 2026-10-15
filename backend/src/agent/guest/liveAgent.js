@@ -4,6 +4,8 @@ import { config } from '../../config.js';
 import * as hotels from '../../modules/hotels/repository.js';
 import { normalizePhone } from '../../utils/misc.js';
 import { appendTranscript, finishCall, logCallError, openCallLog } from './callRecord.js';
+import { keyPool } from '../shared/keys.js';
+import { isBadKey, isRateLimit } from '../shared/model.js';
 import { geminiDeclarations } from '../shared/schema.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
@@ -46,7 +48,7 @@ async function handleCall(client, req) {
     send(client, { type: 'error', message: 'This property is not available.' });
     return client.close();
   }
-  if (!config.gemini.apiKey) {
+  if (!config.gemini.apiKeys.length) {
     send(client, { type: 'error', message: 'Voice agent is not configured.' });
     return client.close();
   }
@@ -64,7 +66,8 @@ async function handleCall(client, req) {
   await openCallLog(hotel, { callId, callerPhone, note: 'Website call', channel: 'web_live', model: config.gemini.liveModel });
 
   const guestTools = buildGuestTools({ session, hotel, callId });
-  const upstream = new WebSocket(`${GEMINI_WS}?key=${config.gemini.apiKey}`);
+  const keys = keyPool.prefer(keyPool.rotated(), 'live'); // tried in turn if one is out of quota
+  let upstream;
   let ready = false;
   let ended = false;
   const pending = []; // client audio that arrived before Gemini was ready
@@ -99,83 +102,101 @@ async function handleCall(client, req) {
   };
   const limit = setTimeout(() => end('time_limit'), config.gemini.maxLiveMinutes * 60 * 1000);
 
-  upstream.on('open', () => {
-    upstream.send(
-      JSON.stringify({
-        setup: {
-          model: `models/${config.gemini.liveModel}`,
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            temperature: 0.7,
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
+  const connect = () => {
+    const key = keys.shift();
+    const ws = new WebSocket(`${GEMINI_WS}?key=${key}`);
+    upstream = ws;
+    ws.on('open', () => {
+      ws.send(
+        JSON.stringify({
+          setup: {
+            model: `models/${config.gemini.liveModel}`,
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              temperature: 0.7,
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
+            },
+            systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
+            tools: [{ functionDeclarations: geminiDeclarations(guestTools) }],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
           },
-          systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
-          tools: [{ functionDeclarations: geminiDeclarations(guestTools) }],
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-        },
-      }),
-    );
-  });
-
-  upstream.on('message', async (raw) => {
-    let m;
-    try {
-      m = JSON.parse(raw.toString());
-    } catch {
-      return;
-    }
-
-    if (m.setupComplete) {
-      ready = true;
-      for (const chunk of pending.splice(0)) sendAudio(chunk);
-      send(client, { type: 'ready', callId });
-      upstream.send(
-        JSON.stringify({ realtimeInput: { text: `[The call has just connected. Greet the caller now by saying: "${greeting}"]` } }),
+        }),
       );
-      return;
-    }
-    const sc = m.serverContent;
-    if (sc) {
-      for (const part of sc.modelTurn?.parts || []) if (part.inlineData?.data) send(client, Buffer.from(part.inlineData.data, 'base64'));
-      if (sc.interrupted) {
-        send(client, { type: 'interrupt' });
-        await flush();
-      }
-      if (sc.inputTranscription?.text) await addText('caller', sc.inputTranscription.text);
-      if (sc.outputTranscription?.text) await addText('agent', sc.outputTranscription.text);
-      if (sc.turnComplete) await flush();
-    }
-    if (m.toolCall?.functionCalls?.length) {
-      const functionResponses = [];
-      for (const fc of m.toolCall.functionCalls) {
-        await flush(); // keep the transcript in spoken order: what was said before the tool ran comes first
-        const result = await invokeGuestTool(guestTools, fc.name, fc.args);
-        send(client, { type: 'tool', name: fc.name, ok: !result.error });
-        functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
-      }
-      upstream.send(JSON.stringify({ toolResponse: { functionResponses } }));
-    }
-    if (m.goAway) console.warn('[live] Gemini sent goAway');
-  });
+    });
 
-  upstream.on('close', (code, reason) => {
-    if (!ended && code !== 1000) {
-      console.error(`[live] Gemini closed ${code} ${reason.toString().slice(0, 200)}`);
-      void logCallError(hotel._id, callId, `Voice model connection closed unexpectedly (code ${code})`, {
-        code,
-        reason: reason.toString().slice(0, 200),
-      });
-    }
-    if (!ended) {
-      if (!ready) send(client, { type: 'error', message: 'The voice service is unavailable right now.' });
-      void end('upstream_closed');
-    }
-  });
-  upstream.on('error', (e) => {
-    console.error('[live] Gemini socket error:', e.message);
-    void logCallError(hotel._id, callId, `Voice model socket error: ${e.message}`);
-  });
+    ws.on('message', async (raw) => {
+      if (ws !== upstream) return;
+      let m;
+      try {
+        m = JSON.parse(raw.toString());
+      } catch {
+        return;
+      }
+
+      if (m.setupComplete) {
+        ready = true;
+        for (const chunk of pending.splice(0)) sendAudio(chunk);
+        send(client, { type: 'ready', callId });
+        ws.send(
+          JSON.stringify({ realtimeInput: { text: `[The call has just connected. Greet the caller now by saying: "${greeting}"]` } }),
+        );
+        return;
+      }
+      const sc = m.serverContent;
+      if (sc) {
+        for (const part of sc.modelTurn?.parts || []) if (part.inlineData?.data) send(client, Buffer.from(part.inlineData.data, 'base64'));
+        if (sc.interrupted) {
+          send(client, { type: 'interrupt' });
+          await flush();
+        }
+        if (sc.inputTranscription?.text) await addText('caller', sc.inputTranscription.text);
+        if (sc.outputTranscription?.text) await addText('agent', sc.outputTranscription.text);
+        if (sc.turnComplete) await flush();
+      }
+      if (m.toolCall?.functionCalls?.length) {
+        const functionResponses = [];
+        for (const fc of m.toolCall.functionCalls) {
+          await flush(); // keep the transcript in spoken order: what was said before the tool ran comes first
+          const result = await invokeGuestTool(guestTools, fc.name, fc.args);
+          send(client, { type: 'tool', name: fc.name, ok: !result.error });
+          functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
+        }
+        ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
+      }
+      if (m.goAway) console.warn('[live] Gemini sent goAway');
+    });
+
+    ws.on('close', (code, reason) => {
+      if (ws !== upstream) return;
+      const why = reason.toString();
+      if (!ended && !ready && keys.length && (isRateLimit(why) || isBadKey(why))) {
+        // This key is out of quota or rejected: set it aside and connect again with the next one
+        if (isRateLimit(why)) keyPool.markLimited(key, 'live', why);
+        else keyPool.markBad(key, 'live');
+        console.warn(`[live] ${keyPool.label(key)} unusable (${why.slice(0, 80)}), trying the next key`);
+        void logCallError(hotel._id, callId, `Voice model refused ${keyPool.label(key)}; switching key`);
+        return connect();
+      }
+      if (!ended && code !== 1000) {
+        console.error(`[live] Gemini closed ${code} ${reason.toString().slice(0, 200)}`);
+        void logCallError(hotel._id, callId, `Voice model connection closed unexpectedly (code ${code})`, {
+          code,
+          reason: reason.toString().slice(0, 200),
+        });
+      }
+      if (!ended) {
+        if (!ready) send(client, { type: 'error', message: 'The voice service is unavailable right now.' });
+        void end('upstream_closed');
+      }
+    });
+    ws.on('error', (e) => {
+      if (ws !== upstream) return;
+      console.error('[live] Gemini socket error:', e.message);
+      void logCallError(hotel._id, callId, `Voice model socket error: ${e.message}`);
+    });
+  };
+  connect();
 
   const sendAudio = (buf) =>
     upstream.send(JSON.stringify({ realtimeInput: { audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
