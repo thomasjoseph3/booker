@@ -26,7 +26,7 @@ const SUMMARY_SCHEMA = {
 };
 
 /** Creates the call record when a call connects. */
-export function openCallLog(hotel, { callId, callerPhone, note, greeting }) {
+export function openCallLog(hotel, { callId, callerPhone, note, greeting, channel, model }) {
   const now = new Date();
   const transcript = [{ role: 'system', text: note, at: now }];
   if (greeting) transcript.push({ role: 'agent', text: greeting, at: now });
@@ -37,6 +37,8 @@ export function openCallLog(hotel, { callId, callerPhone, note, greeting }) {
     fromNumber: callerPhone || undefined,
     toNumber: hotel.phoneNumbers?.[0],
     startedAt: now,
+    channel,
+    model,
     transcript,
   });
 }
@@ -49,6 +51,11 @@ export function appendTranscript(hotelId, callId, entries) {
     callId,
     entries.map((e) => ({ ...e, at })),
   );
+}
+
+/** Records a problem in the call log (visible in the admin) so failures can be diagnosed afterwards. */
+export function logCallError(hotelId, callId, message, detail) {
+  return appendTranscript(hotelId, callId, [{ role: 'system', text: `⚠ ${message}`, data: { error: message, ...detail } }]).catch(() => {});
 }
 
 /** Asks Gemini for a short summary, intent and sentiment. Returns {} if that is not possible. */

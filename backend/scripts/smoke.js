@@ -446,6 +446,83 @@ await step('agent: hotel can be addressed by slug', async () => {
   await api('GET', '/api/agent/hotel', { headers: { 'x-api-key': config.agentMasterKey, 'x-hotel-id': 'no-such-hotel' }, expect: 404 });
 });
 
+await step('staff assistant tools: read-only lookups, scoped to one property', async () => {
+  const hotels = await import('../src/modules/hotels/repository.js');
+  const { runStaffTool } = await import('../src/agent/staff/tools.js');
+  const lakeside = { hotel: await hotels.findById(lakesideId), user: { name: 'Test', role: 'hotel_admin' } };
+  const metro = { hotel: await hotels.findById(metroId), user: { name: 'Test', role: 'hotel_admin' } };
+
+  const overview = await runStaffTool(lakeside, 'get_overview');
+  assert.equal(overview.totalRooms, 30);
+  assert.ok(Array.isArray(overview.arrivalsToday) && overview.counts);
+
+  const avail = await runStaffTool(lakeside, 'check_availability', { checkIn: d(40), checkOut: d(41), adults: 2 });
+  assert.equal(avail.options.length, 3);
+  assert.ok(avail.options.every((o) => o.freeRooms >= 0 && o.total > 0));
+
+  assert.ok(
+    (await runStaffTool(lakeside, 'check_availability', { checkIn: 'nope', checkOut: 'never' })).error,
+    'bad input comes back as an error, not a crash',
+  );
+  assert.ok((await runStaffTool(lakeside, 'no_such_tool')).error);
+
+  const found = await runStaffTool(lakeside, 'list_bookings', { query: booking.code });
+  assert.equal(found.total, 1);
+  const detail = await runStaffTool(lakeside, 'get_booking', { code: booking.code });
+  assert.equal(detail.booking.code, booking.code);
+  assert.ok(detail.payments.length >= 1 && detail.recentHistory.length >= 1);
+
+  assert.ok((await runStaffTool(metro, 'get_booking', { code: booking.code })).error, "another property's booking is invisible");
+});
+
+await step('staff assistant conversations: kept for history, private to their owner, visible to managers', async () => {
+  const token = async (email) =>
+    `Bearer ${(await api('POST', '/api/admin/auth/login', { body: { email, password: 'Admin@123' }, expect: 200 })).data.token}`;
+  const manager = { authorization: await token('manager@lakesidepalms.local') };
+  const desk = { authorization: await token('desk@lakesidepalms.local') };
+  const base = `/api/admin/hotels/${lakesideId}/assistant/chats`;
+
+  const chat = (await api('POST', base, { headers: desk, expect: 201 })).data;
+  const own = (await api('GET', base, { headers: desk, expect: 200 })).data.items;
+  assert.ok(own.some((c) => c._id === chat._id));
+  assert.equal((await api('GET', `${base}/${chat._id}`, { headers: desk, expect: 200 })).data.messageCount, 0);
+
+  const managersOwn = (await api('GET', base, { headers: manager, expect: 200 })).data.items;
+  assert.ok(!managersOwn.some((c) => c._id === chat._id), 'my chats lists only mine');
+  const all = (await api('GET', `${base}?scope=all`, { headers: manager, expect: 200 })).data.items;
+  assert.ok(
+    all.some((c) => c._id === chat._id),
+    'a manager can review staff conversations',
+  );
+  await api('GET', `${base}/${chat._id}`, { headers: manager, expect: 200 });
+
+  const deskAll = (await api('GET', `${base}?scope=all`, { headers: desk, expect: 200 })).data.items;
+  assert.ok(
+    deskAll.every((c) => c.user._id === own[0].user._id),
+    'front desk cannot widen the list to everyone',
+  );
+  const managersChat = (await api('POST', base, { headers: manager, expect: 201 })).data;
+  await api('GET', `${base}/${managersChat._id}`, { headers: desk, expect: 403 });
+  await api('POST', `${base}/${managersChat._id}/messages`, { headers: desk, body: { text: 'hi' }, expect: 403 });
+});
+
+await step('calls left open by a crash are closed with an explanation', async () => {
+  const calls = await import('../src/modules/calls/repository.js');
+  const { closeStaleCalls } = await import('../src/modules/calls/service.js');
+  const old = new Date(Date.now() - 60 * 60 * 1000);
+  await calls.createCall({
+    hotel: lakesideId,
+    callId: 'stale-call',
+    startedAt: old,
+    transcript: [{ role: 'caller', text: 'hello', at: old }],
+  });
+  await calls.createCall({ hotel: lakesideId, callId: 'live-call', startedAt: new Date(), transcript: [] });
+  assert.ok((await closeStaleCalls(15)) >= 1);
+  const stale = await calls.findCallByCallId(lakesideId, 'stale-call');
+  assert.ok(stale.endedAt && stale.outcome === 'abandoned' && stale.transcript.at(-1).text.includes('ended unexpectedly'));
+  assert.equal((await calls.findCallByCallId(lakesideId, 'live-call')).endedAt, undefined, 'a call in progress is left alone');
+});
+
 await step('login is rate limited after repeated failures', async () => {
   const statuses = [];
   for (let i = 0; i < 11; i += 1)

@@ -43,6 +43,9 @@ export async function recordCall(hotel, { callId, transcript, bookingCodes, ...f
   return repo.upsertCall(hotel._id, callId, update);
 }
 
+/** Housekeeping: closes call records that were left open by a crash or restart. */
+export const closeStaleCalls = (olderThanMinutes) => repo.closeStaleCalls(new Date(Date.now() - olderThanMinutes * 60 * 1000));
+
 export const listCalls = repo.listCalls;
 export const findCall = repo.findCall;
 export const listCallbacks = repo.listCallbacks;

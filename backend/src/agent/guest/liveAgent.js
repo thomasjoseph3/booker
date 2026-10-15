@@ -3,7 +3,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { config } from '../../config.js';
 import * as hotels from '../../modules/hotels/repository.js';
 import { normalizePhone } from '../../utils/misc.js';
-import { appendTranscript, finishCall, openCallLog } from './callRecord.js';
+import { appendTranscript, finishCall, logCallError, openCallLog } from './callRecord.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
 import { geminiFunctionDeclarations } from './tools.js';
@@ -61,7 +61,7 @@ async function handleCall(client, req) {
   const callId = `web-${crypto.randomBytes(5).toString('hex')}`;
   const greeting = hotel.agent?.greeting || `Hello, thank you for calling ${hotel.name}. How can I help you today?`;
   const session = createSession({ callerPhone, callerEmail: /^\S+@\S+\.\S+$/.test(callerEmail) ? callerEmail : undefined });
-  await openCallLog(hotel, { callId, callerPhone, note: 'Website call' });
+  await openCallLog(hotel, { callId, callerPhone, note: 'Website call', channel: 'web_live', model: config.gemini.liveModel });
 
   const upstream = new WebSocket(`${GEMINI_WS}?key=${config.gemini.apiKey}`);
   let ready = false;
@@ -148,11 +148,9 @@ async function handleCall(client, req) {
     if (m.toolCall?.functionCalls?.length) {
       const functionResponses = [];
       for (const fc of m.toolCall.functionCalls) {
+        await flush(); // keep the transcript in spoken order: what was said before the tool ran comes first
         const result = await runTool(session, hotel, callId, fc.name, fc.args || {});
         send(client, { type: 'tool', name: fc.name, ok: !result.error });
-        await appendTranscript(hotel._id, callId, [
-          { role: 'tool', text: `${fc.name}(${JSON.stringify(fc.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}` },
-        ]);
         functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
       }
       upstream.send(JSON.stringify({ toolResponse: { functionResponses } }));
@@ -161,13 +159,22 @@ async function handleCall(client, req) {
   });
 
   upstream.on('close', (code, reason) => {
-    if (!ended && code !== 1000) console.error(`[live] Gemini closed ${code} ${reason.toString().slice(0, 200)}`);
+    if (!ended && code !== 1000) {
+      console.error(`[live] Gemini closed ${code} ${reason.toString().slice(0, 200)}`);
+      void logCallError(hotel._id, callId, `Voice model connection closed unexpectedly (code ${code})`, {
+        code,
+        reason: reason.toString().slice(0, 200),
+      });
+    }
     if (!ended) {
       if (!ready) send(client, { type: 'error', message: 'The voice service is unavailable right now.' });
       void end('upstream_closed');
     }
   });
-  upstream.on('error', (e) => console.error('[live] Gemini socket error:', e.message));
+  upstream.on('error', (e) => {
+    console.error('[live] Gemini socket error:', e.message);
+    void logCallError(hotel._id, callId, `Voice model socket error: ${e.message}`);
+  });
 
   const sendAudio = (buf) =>
     upstream.send(JSON.stringify({ realtimeInput: { audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));

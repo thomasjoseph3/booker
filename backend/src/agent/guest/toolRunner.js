@@ -1,12 +1,34 @@
 import { config } from '../../config.js';
+import { appendTranscript } from './callRecord.js';
 import { toolByName } from './tools.js';
 
+const MAX_LOGGED_RESULT = 3000;
+
 /**
- * Executes one tool call by calling the agent's own HTTP API (the same endpoints an external agent runtime
- * would use, so validation, tenant scoping and response shaping live in one place).
- * Never throws: failures come back as `{ error }` so the model can recover in conversation.
+ * Executes one tool call and records it in the call log with its arguments, result, outcome and timing,
+ * so any call can be replayed and debugged later. Never throws: failures come back as `{ error }`
+ * so the model can recover in conversation.
  */
 export async function runTool(session, hotel, callId, name, args) {
+  const started = Date.now();
+  const result = await callAgentApi(session, hotel, callId, name, args);
+  const ms = Date.now() - started;
+  const ok = !result.error;
+  await appendTranscript(hotel._id, callId, [
+    {
+      role: 'tool',
+      text: `${name} → ${ok ? 'ok' : `ERROR ${result.error}`} (${ms} ms)`,
+      data: { name, args, ok, ms, error: result.error, result: JSON.stringify(result).slice(0, MAX_LOGGED_RESULT) },
+    },
+  ]);
+  return result;
+}
+
+/**
+ * Calls the agent's own HTTP API (the same endpoints an external agent runtime would use, so validation,
+ * tenant scoping and response shaping live in one place).
+ */
+async function callAgentApi(session, hotel, callId, name, args) {
   const tool = toolByName[name];
   if (!tool) return { error: `Unknown tool ${name}` };
   const input = { ...args };

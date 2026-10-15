@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
+import { config } from '../../config.js';
 import { geminiFunctionDeclarations } from './tools.js';
-import { appendTranscript, finishCall, openCallLog } from './callRecord.js';
+import { appendTranscript, finishCall, logCallError, openCallLog } from './callRecord.js';
 import { generateContent } from '../shared/gemini.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
@@ -44,7 +45,14 @@ export async function startCall(hotel, { callerPhone, callerEmail }) {
       { role: 'model', parts: [{ text: greeting }] },
     ],
   });
-  await openCallLog(hotel, { callId, callerPhone: phone, note: 'Browser test call', greeting });
+  await openCallLog(hotel, {
+    callId,
+    callerPhone: phone,
+    note: 'Browser test call',
+    greeting,
+    channel: 'web_text',
+    model: config.gemini.models[0],
+  });
   return { callId, greeting };
 }
 
@@ -59,7 +67,7 @@ export async function agentTurn(hotel, callId, text) {
   const used = [];
   try {
     session.contents.push({ role: 'user', parts: [{ text }] });
-    const entries = [{ role: 'caller', text }];
+    await appendTranscript(hotel._id, callId, [{ role: 'caller', text }]);
     let reply = '';
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const data = await generateContent({
@@ -86,18 +94,16 @@ export async function agentTurn(hotel, callId, text) {
       for (const { functionCall: call } of calls) {
         const result = await runTool(session, hotel, callId, call.name, call.args || {});
         used.push({ name: call.name, ok: !result.error });
-        entries.push({
-          role: 'tool',
-          text: `${call.name}(${JSON.stringify(call.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}`,
-        });
         responses.push({ functionResponse: { name: call.name, response: { result } } });
       }
       session.contents.push({ role: 'user', parts: responses });
     }
     reply ||= 'Sorry, could you repeat that?';
-    entries.push({ role: 'agent', text: reply });
-    await appendTranscript(hotel._id, callId, entries);
+    await appendTranscript(hotel._id, callId, [{ role: 'agent', text: reply }]);
     return { reply, tools: used };
+  } catch (e) {
+    await logCallError(hotel._id, callId, `Agent turn failed: ${e.message}`);
+    throw e;
   } finally {
     session.busy = false;
   }

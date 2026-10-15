@@ -13,7 +13,12 @@ const callLogSchema = new Schema(
     startedAt: Date,
     endedAt: Date,
     durationSec: Number,
-    transcript: [{ role: { type: String, enum: ['caller', 'agent', 'system', 'tool'] }, text: String, at: Date, _id: false }],
+    // `data` carries debugging detail for tool calls ({ name, args, ok, ms, result, error }) and errors
+    transcript: [
+      { role: { type: String, enum: ['caller', 'agent', 'system', 'tool'] }, text: String, at: Date, data: Schema.Types.Mixed, _id: false },
+    ],
+    channel: { type: String, enum: ['web_live', 'web_text', 'phone'] }, // how the call reached the agent
+    model: String, // the AI model that handled it
     summary: String,
     intent: String,
     outcome: { type: String, enum: ['booked', 'cancelled', 'modified', 'inquiry', 'callback_requested', 'abandoned', 'other'] },

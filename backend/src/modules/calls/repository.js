@@ -29,6 +29,33 @@ export const updateCall = (hotelId, callId, update) =>
 export const addBookingToCall = (hotelId, callId, bookingId) =>
   CallLog.updateOne({ hotel: hotelId, callId }, { $addToSet: { bookings: bookingId } });
 
+/**
+ * Closes calls that started before `cutoff` and never ended (the server restarted or the connection died
+ * mid-call), noting why in the transcript. Returns how many were closed.
+ */
+export async function closeStaleCalls(cutoff, now = new Date()) {
+  const result = await CallLog.updateMany(
+    { endedAt: { $exists: false }, startedAt: { $lt: cutoff } },
+    [
+      {
+        $set: {
+          endedAt: now,
+          durationSec: { $round: [{ $divide: [{ $subtract: [now, '$startedAt'] }, 1000] }, 0] },
+          outcome: { $ifNull: ['$outcome', 'abandoned'] },
+          transcript: {
+            $concatArrays: [
+              '$transcript',
+              [{ role: 'system', text: '⚠ Call ended unexpectedly (server restart or lost connection).', at: now }],
+            ],
+          },
+        },
+      },
+    ],
+    { updatePipeline: true },
+  );
+  return result.modifiedCount;
+}
+
 export const callsForGuest = (hotelId, guest) =>
   CallLog.find({ hotel: hotelId, $or: [{ guest: guest._id }, { fromNumber: guest.phone }] })
     .select('-transcript')

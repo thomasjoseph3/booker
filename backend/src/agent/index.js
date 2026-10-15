@@ -11,3 +11,4 @@ export { default as agentRouter } from './guest/routes.js';
 export { attachLiveAgent } from './guest/liveAgent.js';
 export * as textAgent from './guest/textAgent.js';
 export { default as guestTestRoutes } from './guest/testCallRoutes.js';
+export { default as staffAssistantRoutes } from './staff/routes.js';
