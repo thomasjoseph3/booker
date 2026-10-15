@@ -43,3 +43,6 @@ export async function loadHotelParam(req, res, next, hotelId) {
   req.hotel = hotel;
   next();
 }
+
+/** Property managers only (platform admins and hotel admins, not front-desk staff). */
+export const managers = requireRole('super_admin', 'hotel_admin');
