@@ -13,18 +13,30 @@ export async function runTool(session, hotel, callId, name, args) {
   if (input.phone === undefined && session.callerPhone && tool.function.parameters.properties.phone) input.phone = session.callerPhone;
   if (name === 'create_booking') {
     input.callId = callId;
-    input.guest = { ...(session.callerPhone ? { phone: session.callerPhone } : {}), ...(session.callerEmail ? { email: session.callerEmail } : {}), ...input.guest };
+    input.guest = {
+      ...(session.callerPhone ? { phone: session.callerPhone } : {}),
+      ...(session.callerEmail ? { email: session.callerEmail } : {}),
+      ...input.guest,
+    };
   }
   if (name === 'request_human_callback') input.callId = callId;
 
   const { method, path } = tool.http;
-  const url = new URL(path.replace(/\{(\w+)\}/g, (_, k) => encodeURIComponent(input[k] ?? '')), `http://127.0.0.1:${config.port}`);
+  const url = new URL(
+    path.replace(/\{(\w+)\}/g, (_, k) => encodeURIComponent(input[k] ?? '')),
+    `http://127.0.0.1:${config.port}`,
+  );
   const asQuery = method === 'GET';
   if (asQuery) for (const [k, v] of Object.entries(input)) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
   try {
     const res = await fetch(url, {
       method,
-      headers: { 'x-api-key': config.internalAgentKey, 'x-hotel-id': String(hotel._id), 'x-call-id': callId, ...(asQuery ? {} : { 'content-type': 'application/json' }) },
+      headers: {
+        'x-api-key': config.internalAgentKey,
+        'x-hotel-id': String(hotel._id),
+        'x-call-id': callId,
+        ...(asQuery ? {} : { 'content-type': 'application/json' }),
+      },
       body: asQuery ? undefined : JSON.stringify(input),
     });
     const data = await res.json().catch(() => ({}));

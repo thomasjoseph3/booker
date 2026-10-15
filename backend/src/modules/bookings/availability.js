@@ -32,7 +32,11 @@ export async function searchAvailability(hotel, { checkIn, checkOut, adults = 1,
       availableRooms,
       roomsNeeded: fits ? rooms : null,
       bookable: fits && availableRooms >= rooms,
-      reason: !fits ? 'Room type does not accommodate this party' : availableRooms < rooms ? 'Not enough rooms available for these dates' : undefined,
+      reason: !fits
+        ? 'Room type does not accommodate this party'
+        : availableRooms < rooms
+          ? 'Not enough rooms available for these dates'
+          : undefined,
       quote: quoteStay(hotel, rt, { checkIn, checkOut, roomsCount: rooms }),
     };
   });

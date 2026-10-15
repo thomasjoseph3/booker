@@ -14,8 +14,14 @@ for (const hotel of await Hotel.find()) {
   }
   for (const row of await Inventory.find({ hotel: hotel._id })) {
     const rt = rts.get(String(row.roomType));
-    if (row.booked > rt.totalRooms) { problems += 1; console.log(`OVERBOOKED ${hotel.name} ${rt.name} ${row.date}: ${row.booked}/${rt.totalRooms}`); }
-    if (row.booked !== (expected.get(`${row.roomType}:${row.date}`) || 0)) { problems += 1; console.log(`DRIFT ${hotel.name} ${rt.name} ${row.date}: ${row.booked} vs ${expected.get(`${row.roomType}:${row.date}`) || 0}`); }
+    if (row.booked > rt.totalRooms) {
+      problems += 1;
+      console.log(`OVERBOOKED ${hotel.name} ${rt.name} ${row.date}: ${row.booked}/${rt.totalRooms}`);
+    }
+    if (row.booked !== (expected.get(`${row.roomType}:${row.date}`) || 0)) {
+      problems += 1;
+      console.log(`DRIFT ${hotel.name} ${rt.name} ${row.date}: ${row.booked} vs ${expected.get(`${row.roomType}:${row.date}`) || 0}`);
+    }
   }
   console.log(`${hotel.name}: checked`);
 }

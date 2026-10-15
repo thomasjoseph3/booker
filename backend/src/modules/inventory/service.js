@@ -20,12 +20,16 @@ export async function reserveInventory(roomType, checkIn, checkOut, qty) {
   }
 }
 
-export const releaseInventory = (roomTypeId, checkIn, checkOut, qty) => repo.releaseNights(roomTypeId, nightsBetween(checkIn, checkOut), qty);
+export const releaseInventory = (roomTypeId, checkIn, checkOut, qty) =>
+  repo.releaseNights(roomTypeId, nightsBetween(checkIn, checkOut), qty);
 
 /** Rooms still sellable per room type for the whole stay. */
 export async function availabilityFor(roomTypes, checkIn, checkOut) {
   const nights = nightsBetween(checkIn, checkOut);
-  const rows = await repo.rowsForRoomTypes(roomTypes.map((r) => r._id), nights);
+  const rows = await repo.rowsForRoomTypes(
+    roomTypes.map((r) => r._id),
+    nights,
+  );
   const byKey = new Map(rows.map((r) => [`${r.roomType}:${r.date}`, r]));
   const result = new Map();
   for (const rt of roomTypes) {

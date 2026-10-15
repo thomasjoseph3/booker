@@ -7,10 +7,19 @@ export function errorHandler(err, req, res, next) {
   }
   if (err.name === 'CastError') return res.status(400).json({ error: { code: 'BAD_REQUEST', message: `Invalid value for ${err.path}` } });
   if (err.name === 'ValidationError') {
-    return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: Object.values(err.errors).map((e) => e.message).join('; ') } });
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: Object.values(err.errors)
+          .map((e) => e.message)
+          .join('; '),
+      },
+    });
   }
   if (err.code === 11000) {
-    return res.status(409).json({ error: { code: 'DUPLICATE', message: `Duplicate value for ${Object.keys(err.keyValue || {}).join(', ')}` } });
+    return res
+      .status(409)
+      .json({ error: { code: 'DUPLICATE', message: `Duplicate value for ${Object.keys(err.keyValue || {}).join(', ')}` } });
   }
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: { code: 'BAD_JSON', message: 'Malformed JSON body' } });
   console.error(err);

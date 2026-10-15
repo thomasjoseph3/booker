@@ -11,7 +11,11 @@ export const pageQuery = z.object({
  * @returns {Promise<{items: object[], total: number, page: number, pages: number}>}
  */
 export async function paginate(model, filter, q, { sort = { createdAt: -1 }, populate, select } = {}) {
-  let query = model.find(filter).sort(sort).skip((q.page - 1) * q.limit).limit(q.limit);
+  let query = model
+    .find(filter)
+    .sort(sort)
+    .skip((q.page - 1) * q.limit)
+    .limit(q.limit);
   if (populate) query = query.populate(...populate);
   if (select) query = query.select(select);
   const [items, total] = await Promise.all([query, model.countDocuments(filter)]);

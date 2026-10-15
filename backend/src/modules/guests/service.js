@@ -12,7 +12,13 @@ export async function listGuests(hotel, text, page) {
   const stats = new Map((await bookings.statsByGuest(result.items.map((g) => g._id))).map((s) => [String(s._id), s]));
   result.items = result.items.map((guest) => {
     const s = stats.get(String(guest._id)) || {};
-    return { ...guest.toObject(), bookings: s.bookings || 0, stays: s.stays || 0, spent: round2(s.spent || 0), lastStay: s.lastStay || null };
+    return {
+      ...guest.toObject(),
+      bookings: s.bookings || 0,
+      stays: s.stays || 0,
+      spent: round2(s.spent || 0),
+      lastStay: s.lastStay || null,
+    };
   });
   return result;
 }

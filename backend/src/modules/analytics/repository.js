@@ -4,7 +4,20 @@ import { Booking, Callback, CallLog, Inventory, Payment, Room, RoomType } from '
 
 /** Raw numbers for the dashboard: today's arrivals and departures, counters, 30-day money, near-term sold rooms. */
 export async function dashboardQueries({ hotelId: h, today, since, startOfToday, horizon }) {
-  const [roomTypes, arrivals, departures, inHouse, pendingPayment, openCallbacks, callsToday, bookingsToday, money, inv, bySource, roomStatus] = await Promise.all([
+  const [
+    roomTypes,
+    arrivals,
+    departures,
+    inHouse,
+    pendingPayment,
+    openCallbacks,
+    callsToday,
+    bookingsToday,
+    money,
+    inv,
+    bySource,
+    roomStatus,
+  ] = await Promise.all([
     RoomType.find({ hotel: h, active: true }).lean(),
     Booking.find({ hotel: h, checkIn: today, status: { $in: ['confirmed', 'pending_payment', 'checked_in'] } }).sort({ guestName: 1 }),
     Booking.find({ hotel: h, checkOut: today, status: { $in: ['checked_in', 'checked_out'] } }).sort({ guestName: 1 }),
@@ -21,7 +34,20 @@ export async function dashboardQueries({ hotelId: h, today, since, startOfToday,
     Booking.aggregate([{ $match: { hotel: h, createdAt: { $gte: since } } }, { $group: { _id: '$source', count: { $sum: 1 } } }]),
     Room.aggregate([{ $match: { hotel: h } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
   ]);
-  return { roomTypes, arrivals, departures, inHouse, pendingPayment, openCallbacks, callsToday, bookingsToday, money, inv, bySource, roomStatus };
+  return {
+    roomTypes,
+    arrivals,
+    departures,
+    inHouse,
+    pendingPayment,
+    openCallbacks,
+    callsToday,
+    bookingsToday,
+    money,
+    inv,
+    bySource,
+    roomStatus,
+  };
 }
 
 /** Raw numbers for the analytics page: calls, agent bookings, sources, room types, occupancy history, repeat guests. */
@@ -36,13 +62,22 @@ export async function analyticsQueries({ hotelId: h, timezone: tz, since, pastNi
           total: [{ $count: 'n' }],
           byOutcome: [{ $group: { _id: '$outcome', n: { $sum: 1 } } }],
           bySentiment: [{ $group: { _id: '$sentiment', n: { $sum: 1 } } }],
-          duration: [{ $match: { durationSec: { $gt: 0 } } }, { $group: { _id: null, avg: { $avg: '$durationSec' }, total: { $sum: '$durationSec' } } }],
+          duration: [
+            { $match: { durationSec: { $gt: 0 } } },
+            { $group: { _id: null, avg: { $avg: '$durationSec' }, total: { $sum: '$durationSec' } } },
+          ],
         },
       },
     ]),
     CallLog.aggregate([
       { $match: { hotel: h, createdAt: { $gte: since } } },
-      { $group: { _id: dayOf({ $ifNull: ['$startedAt', '$createdAt'] }), calls: { $sum: 1 }, booked: { $sum: { $cond: [{ $eq: ['$outcome', 'booked'] }, 1, 0] } } } },
+      {
+        $group: {
+          _id: dayOf({ $ifNull: ['$startedAt', '$createdAt'] }),
+          calls: { $sum: 1 },
+          booked: { $sum: { $cond: [{ $eq: ['$outcome', 'booked'] }, 1, 0] } },
+        },
+      },
       { $sort: { _id: 1 } },
     ]),
     CallLog.aggregate([
@@ -82,7 +117,14 @@ export async function analyticsQueries({ hotelId: h, timezone: tz, since, pastNi
     ]),
     Booking.aggregate([
       { $match: { hotel: h, createdAt: { $gte: since }, status: { $nin: ['expired', 'cancelled'] } } },
-      { $group: { _id: '$roomTypeName', bookings: { $sum: 1 }, revenue: { $sum: '$total' }, roomNights: { $sum: { $multiply: ['$nights', '$roomsCount'] } } } },
+      {
+        $group: {
+          _id: '$roomTypeName',
+          bookings: { $sum: 1 },
+          revenue: { $sum: '$total' },
+          roomNights: { $sum: { $multiply: ['$nights', '$roomsCount'] } },
+        },
+      },
       { $sort: { revenue: -1, _id: 1 } },
     ]),
     Inventory.aggregate([{ $match: { hotel: h, date: { $in: pastNights } } }, { $group: { _id: '$date', booked: { $sum: '$booked' } } }]),

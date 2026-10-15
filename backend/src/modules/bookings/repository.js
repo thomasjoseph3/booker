@@ -9,7 +9,8 @@ export const findById = (id) => Booking.findById(id);
 
 export const findByCode = (hotelId, code) => Booking.findOne({ hotel: hotelId, code: String(code).trim().toUpperCase() });
 
-export const idsForCodes = (hotelId, codes) => Booking.find({ hotel: hotelId, code: { $in: codes.map((c) => c.toUpperCase()) } }).distinct('_id');
+export const idsForCodes = (hotelId, codes) =>
+  Booking.find({ hotel: hotelId, code: { $in: codes.map((c) => c.toUpperCase()) } }).distinct('_id');
 
 export const listForGuest = (guestId) => Booking.find({ guest: guestId }).select('-history -nightlyRates').sort({ checkIn: -1 });
 
@@ -24,13 +25,16 @@ export const findUpcomingByPhone = (hotel, last10) =>
 
 export const populateDetail = (booking) => booking.populate([{ path: 'assignedRooms', select: 'number floor' }, { path: 'guest' }]);
 
-export const dueHolds = async (now) => (await Booking.find({ status: 'pending_payment', holdExpiresAt: { $lte: now } }).select('_id')).map((b) => b._id);
+export const dueHolds = async (now) =>
+  (await Booking.find({ status: 'pending_payment', holdExpiresAt: { $lte: now } }).select('_id')).map((b) => b._id);
 
 /** Guests currently in house and the most recent departures, for the given physical rooms. */
 export async function staysForRooms(hotelId, roomIds) {
   const fields = 'code guestName checkIn checkOut checkedInAt checkedOutAt assignedRooms adults children';
   const [inHouse, departed] = await Promise.all([
-    Booking.find({ hotel: hotelId, status: 'checked_in', assignedRooms: { $in: roomIds } }).select(fields).lean(),
+    Booking.find({ hotel: hotelId, status: 'checked_in', assignedRooms: { $in: roomIds } })
+      .select(fields)
+      .lean(),
     Booking.find({ hotel: hotelId, status: 'checked_out', assignedRooms: { $in: roomIds }, checkedOutAt: { $ne: null } })
       .sort({ checkedOutAt: -1 })
       .limit(500)
@@ -105,12 +109,17 @@ export const transition = (filter, { set, unset, history }) =>
 
 export const pushHistory = (id, entry) => Booking.updateOne({ _id: id }, { $push: { history: entry } });
 
-export const addPayment = (id, amount, entry) => Booking.updateOne({ _id: id }, { $inc: { amountPaid: amount }, $push: { history: entry } });
+export const addPayment = (id, amount, entry) =>
+  Booking.updateOne({ _id: id }, { $inc: { amountPaid: amount }, $push: { history: entry } });
 
-export const addRefund = (id, amount, entry) => Booking.updateOne({ _id: id }, { $inc: { amountRefunded: amount }, $push: { history: entry } });
+export const addRefund = (id, amount, entry) =>
+  Booking.updateOne({ _id: id }, { $inc: { amountRefunded: amount }, $push: { history: entry } });
 
 /** Marks the rooms as given back from `fromDay`. True only for the call that flipped it, so inventory is released exactly once. */
 export async function markInventoryReleased(id, fromDay) {
-  const result = await Booking.updateOne({ _id: id, inventoryHeld: true }, { $set: { inventoryHeld: false, inventoryReleasedFrom: fromDay } });
+  const result = await Booking.updateOne(
+    { _id: id, inventoryHeld: true },
+    { $set: { inventoryHeld: false, inventoryReleasedFrom: fromDay } },
+  );
   return result.modifiedCount === 1;
 }

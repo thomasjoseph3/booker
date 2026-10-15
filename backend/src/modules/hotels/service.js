@@ -15,7 +15,8 @@ export async function updateHotel(hotel, changes, user) {
   for (const [key, value] of Object.entries(changes)) {
     if (key === 'slug' && user.role !== 'super_admin') throw badRequest('Only platform admins can change the slug');
     const current = hotel.get(key);
-    const isNested = value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current);
+    const isNested =
+      value && typeof value === 'object' && !Array.isArray(value) && current && typeof current === 'object' && !Array.isArray(current);
     hotel.set(key, isNested ? { ...(current.toObject?.() ?? current), ...value } : value);
   }
   if (changes.phoneNumbers) hotel.phoneNumbers = changes.phoneNumbers.map(normalizePhone);

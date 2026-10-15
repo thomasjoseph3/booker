@@ -44,12 +44,19 @@ export function openCallLog(hotel, { callId, callerPhone, note, greeting }) {
 /** Appends transcript lines: `[{ role: 'caller' | 'agent' | 'tool', text }]`. */
 export function appendTranscript(hotelId, callId, entries) {
   const at = new Date();
-  return calls.appendTranscript(hotelId, callId, entries.map((e) => ({ ...e, at })));
+  return calls.appendTranscript(
+    hotelId,
+    callId,
+    entries.map((e) => ({ ...e, at })),
+  );
 }
 
 /** Asks Gemini for a short summary, intent and sentiment. Returns {} if that is not possible. */
 async function summarize(transcript) {
-  const text = transcript.filter((t) => t.role !== 'tool').map((t) => `${t.role}: ${t.text}`).join('\n');
+  const text = transcript
+    .filter((t) => t.role !== 'tool')
+    .map((t) => `${t.role}: ${t.text}`)
+    .join('\n');
   try {
     const data = await generateContent({
       contents: [{ role: 'user', parts: [{ text: `Summarise this hotel phone call.\n\n${text}` }] }],
@@ -57,7 +64,12 @@ async function summarize(transcript) {
     });
     const result = JSON.parse(data.candidates[0].content.parts[0].text);
     // snake_case like the rest of the data (the admin turns underscores into spaces for display)
-    if (result.intent) result.intent = result.intent.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (result.intent)
+      result.intent = result.intent
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
     return result;
   } catch (e) {
     console.error(`[agent] call summary failed: ${e.message}`);

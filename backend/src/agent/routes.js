@@ -10,7 +10,13 @@ import { forbidden, notFound } from '../utils/errors.js';
 import { money } from '../utils/money.js';
 import { normalizePhone } from '../utils/misc.js';
 import {
-  availabilitySchema, callbackSchema, callerLookupSchema, callerSchema, callLogSchema, createBookingSchema, modifyBookingSchema,
+  availabilitySchema,
+  callbackSchema,
+  callerLookupSchema,
+  callerSchema,
+  callLogSchema,
+  createBookingSchema,
+  modifyBookingSchema,
 } from '../validation.js';
 import { requireAgent, requireHotelContext } from './auth.js';
 import { agentTools } from './tools.js';
@@ -56,11 +62,12 @@ router.post('/bookings', validate(createBookingSchema), async (req, res) => {
   if (req.body.callId) {
     await callsRepo.addBookingToCall(req.hotel._id, req.body.callId, booking._id);
   }
-  const sayNext = booking.status === 'confirmed'
-    ? `Booking ${booking.code} is confirmed. Total ${money(booking.currency, booking.total)}, payable at the hotel.`
-    : paymentError
-      ? `The room is on hold as ${booking.code}, but the payment link could not be sent (${paymentError}). Try resending the payment link, or offer a callback from staff.`
-      : paymentSentence(req.hotel, booking, payment);
+  const sayNext =
+    booking.status === 'confirmed'
+      ? `Booking ${booking.code} is confirmed. Total ${money(booking.currency, booking.total)}, payable at the hotel.`
+      : paymentError
+        ? `The room is on hold as ${booking.code}, but the payment link could not be sent (${paymentError}). Try resending the payment link, or offer a callback from staff.`
+        : paymentSentence(req.hotel, booking, payment);
   res.status(201).json({ booking: agentBookingView(booking, payment), sayNext });
 });
 
@@ -75,16 +82,28 @@ router.get('/bookings/:code/cancellation-quote', validate(callerSchema, 'query')
   res.json({ code: booking.code, ...svc.cancellationQuote(req.hotel, booking) });
 });
 
-router.post('/bookings/:code/cancel', validate(callerSchema.extend({ reason: callbackSchema.shape.reason.optional() })), async (req, res) => {
-  const booking = await callerBooking(req);
-  const { booking: updated, fee, refundAmount } = await svc.cancelBooking(req.hotel, booking, { reason: req.body.reason || 'Cancelled by guest over phone' }, req.actor);
-  res.json({
-    booking: agentBookingView(updated),
-    fee,
-    refundAmount,
-    sayNext: `Booking ${updated.code} is cancelled.` + (refundAmount > 0 ? ` A refund of ${money(updated.currency, refundAmount)} has been initiated and usually reaches the original payment method in 5 to 7 working days.` : ''),
-  });
-});
+router.post(
+  '/bookings/:code/cancel',
+  validate(callerSchema.extend({ reason: callbackSchema.shape.reason.optional() })),
+  async (req, res) => {
+    const booking = await callerBooking(req);
+    const {
+      booking: updated,
+      fee,
+      refundAmount,
+    } = await svc.cancelBooking(req.hotel, booking, { reason: req.body.reason || 'Cancelled by guest over phone' }, req.actor);
+    res.json({
+      booking: agentBookingView(updated),
+      fee,
+      refundAmount,
+      sayNext:
+        `Booking ${updated.code} is cancelled.` +
+        (refundAmount > 0
+          ? ` A refund of ${money(updated.currency, refundAmount)} has been initiated and usually reaches the original payment method in 5 to 7 working days.`
+          : ''),
+    });
+  },
+);
 
 router.patch('/bookings/:code', validate(callerSchema.extend(modifyBookingSchema.shape)), async (req, res) => {
   const booking = await callerBooking(req);

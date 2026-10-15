@@ -6,7 +6,8 @@ export const findByPhone = (hotelId, phone) => Guest.findOne({ hotel: hotelId, p
 
 export const findById = (hotelId, id) => Guest.findOne({ _id: id, hotel: hotelId });
 
-export const update = (hotelId, id, changes) => Guest.findOneAndUpdate({ _id: id, hotel: hotelId }, { $set: changes }, { returnDocument: 'after' });
+export const update = (hotelId, id, changes) =>
+  Guest.findOneAndUpdate({ _id: id, hotel: hotelId }, { $set: changes }, { returnDocument: 'after' });
 
 /** Paginated guest list, optionally filtered by name, phone or email. */
 export function search(hotelId, text, page) {

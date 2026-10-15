@@ -22,7 +22,13 @@ export function raiseStaffTask(hotel, booking, reason) {
 /** An agent asks for a human to call the guest back. */
 export async function requestCallback(hotel, { bookingCode, ...data }, actor) {
   const booking = bookingCode ? await bookings.findByCode(hotel._id, bookingCode) : null;
-  return repo.createCallback({ ...data, phone: normalizePhone(data.phone), hotel: hotel._id, booking: booking?._id, createdBy: actor.label });
+  return repo.createCallback({
+    ...data,
+    phone: normalizePhone(data.phone),
+    hotel: hotel._id,
+    booking: booking?._id,
+    createdBy: actor.label,
+  });
 }
 
 /** An external agent runtime reports a finished (or ongoing) call: transcript lines are appended, other fields set. */

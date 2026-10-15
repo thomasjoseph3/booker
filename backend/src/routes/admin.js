@@ -26,7 +26,8 @@ router.param('hotelId', loadHotelParam);
 router.use(hotels);
 
 const scoped = Router({ mergeParams: true });
-for (const feature of [analytics, rooms, inventory, bookings, payments, guests, calls, notifications, adminAgentRoutes]) scoped.use(feature);
+for (const feature of [analytics, rooms, inventory, bookings, payments, guests, calls, notifications, adminAgentRoutes])
+  scoped.use(feature);
 router.use('/hotels/:hotelId', scoped);
 
 export default router;

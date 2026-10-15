@@ -10,17 +10,33 @@ async function syncTotalRooms(typeId) {
 }
 
 const stayBrief = (b) =>
-  b && { code: b.code, guestName: b.guestName, checkIn: b.checkIn, checkOut: b.checkOut, checkedInAt: b.checkedInAt, checkedOutAt: b.checkedOutAt, adults: b.adults, children: b.children };
+  b && {
+    code: b.code,
+    guestName: b.guestName,
+    checkIn: b.checkIn,
+    checkOut: b.checkOut,
+    checkedInAt: b.checkedInAt,
+    checkedOutAt: b.checkedOutAt,
+    adults: b.adults,
+    children: b.children,
+  };
 
 /** Rooms with the guest currently in them and the last guest who left (housekeeping view). */
 export async function listRoomsWithStays(hotel, filters) {
   const rooms = await repo.listRooms(hotel._id, filters);
-  const { inHouse, departed } = await bookings.staysForRooms(hotel._id, rooms.map((r) => r._id));
+  const { inHouse, departed } = await bookings.staysForRooms(
+    hotel._id,
+    rooms.map((r) => r._id),
+  );
   const current = new Map();
   for (const b of inHouse) for (const r of b.assignedRooms) current.set(String(r), b);
   const last = new Map();
   for (const b of departed) for (const r of b.assignedRooms) if (!last.has(String(r))) last.set(String(r), b);
-  return rooms.map((r) => ({ ...r.toObject(), currentStay: stayBrief(current.get(String(r._id))) ?? null, lastStay: stayBrief(last.get(String(r._id))) ?? null }));
+  return rooms.map((r) => ({
+    ...r.toObject(),
+    currentStay: stayBrief(current.get(String(r._id))) ?? null,
+    lastStay: stayBrief(last.get(String(r._id))) ?? null,
+  }));
 }
 
 export async function createRoom(hotel, { roomTypeId, ...data }) {
@@ -32,7 +48,8 @@ export async function createRoom(hotel, { roomTypeId, ...data }) {
 
 /** Front desk may update a room's status (cleaning to available); only managers may change its number or type. */
 export async function updateRoom(hotel, user, id, { roomTypeId, ...changes }) {
-  if ((roomTypeId || changes.number) && !MANAGER_ROLES.includes(user.role)) throw badRequest('Only managers can change room number or type');
+  if ((roomTypeId || changes.number) && !MANAGER_ROLES.includes(user.role))
+    throw badRequest('Only managers can change room number or type');
   const room = await repo.findRoom(hotel._id, id);
   if (!room) throw notFound('Room');
   const oldType = room.roomType;

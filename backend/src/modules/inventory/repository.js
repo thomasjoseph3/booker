@@ -34,4 +34,5 @@ export const rowsForRoomTypes = (roomTypeIds, nights) => Inventory.find({ roomTy
 
 export const rowsForHotel = (hotelId, nights) => Inventory.find({ hotel: hotelId, date: { $in: nights } }).lean();
 
-export const setClosed = (roomTypeId, nights, closed) => Inventory.updateMany({ roomType: roomTypeId, date: { $in: nights } }, { $set: { closed } });
+export const setClosed = (roomTypeId, nights, closed) =>
+  Inventory.updateMany({ roomType: roomTypeId, date: { $in: nights } }, { $set: { closed } });

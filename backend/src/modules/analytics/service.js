@@ -13,7 +13,20 @@ export async function dashboard(hotel) {
     startOfToday: new Date(Date.now() - 24 * 3600 * 1000),
     horizon,
   });
-  const { roomTypes, arrivals, departures, inHouse, pendingPayment, openCallbacks, callsToday, bookingsToday, money, inv, bySource, roomStatus } = data;
+  const {
+    roomTypes,
+    arrivals,
+    departures,
+    inHouse,
+    pendingPayment,
+    openCallbacks,
+    callsToday,
+    bookingsToday,
+    money,
+    inv,
+    bySource,
+    roomStatus,
+  } = data;
 
   const totalRooms = roomTypes.reduce((s, rt) => s + rt.totalRooms, 0);
   const bookedByDate = new Map(inv.map((r) => [r._id, r.booked]));
@@ -38,7 +51,13 @@ export async function dashboard(hotel) {
     revenue30d: { collected: round2(collected), refunded: round2(refunded), net: round2(collected - refunded) },
     bookingsBySource30d: Object.fromEntries(bySource.map((s) => [s._id, s.count])),
     // physical rooms right now (housekeeping view); `occupancyTonight` is what is sold
-    roomStatus: { available: 0, occupied: 0, cleaning: 0, out_of_service: 0, ...Object.fromEntries(roomStatus.map((s) => [s._id, s.count])) },
+    roomStatus: {
+      available: 0,
+      occupied: 0,
+      cleaning: 0,
+      out_of_service: 0,
+      ...Object.fromEntries(roomStatus.map((s) => [s._id, s.count])),
+    },
   };
 }
 
@@ -67,7 +86,10 @@ export async function analytics(hotel, days) {
 
   const totalRooms = roomTypes.reduce((s, rt) => s + rt.totalRooms, 0);
   const bookedBy = new Map(inv.map((r) => [r._id, r.booked]));
-  const occupancy = pastNights.map((date) => ({ date, percent: totalRooms ? Math.round(((bookedBy.get(date) || 0) / totalRooms) * 100) : 0 }));
+  const occupancy = pastNights.map((date) => ({
+    date,
+    percent: totalRooms ? Math.round(((bookedBy.get(date) || 0) / totalRooms) * 100) : 0,
+  }));
   const soldNights = pastNights.reduce((s, d) => s + (bookedBy.get(d) || 0), 0);
   const roomNightsAll = bySource.reduce((s, x) => s + x.roomNights, 0);
   const revenueAll = bySource.reduce((s, x) => s + x.revenue, 0);
@@ -97,7 +119,13 @@ export async function analytics(hotel, days) {
       bookingValue: round2(agentValue),
     },
     bookings: {
-      bySource: bySource.map((x) => ({ source: x._id, bookings: x.bookings, cancelled: x.cancelled, revenue: round2(x.revenue), roomNights: x.roomNights })),
+      bySource: bySource.map((x) => ({
+        source: x._id,
+        bookings: x.bookings,
+        cancelled: x.cancelled,
+        revenue: round2(x.revenue),
+        roomNights: x.roomNights,
+      })),
       byRoomType: byRoomType.map((x) => ({ roomType: x._id, bookings: x.bookings, revenue: round2(x.revenue), roomNights: x.roomNights })),
       averageDailyRate: roomNightsAll ? round2(revenueAll / roomNightsAll) : 0,
       repeatGuestPercent: repeatGuests[0]?.guests ? Math.round((repeatGuests[0].repeat / repeatGuests[0].guests) * 100) : 0,

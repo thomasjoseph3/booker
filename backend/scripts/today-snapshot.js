@@ -79,23 +79,89 @@ export async function loadTodaySnapshot(hotel) {
     const createdAt = source === 'walk_in' ? at(checkIn, 13, 20) : at(addDays(checkIn, -lead), 11, 15);
     const checkedInAt = at(checkIn, 14 + (bookings.length % 4), (bookings.length * 13) % 60);
     const b = new Booking({
-      hotel: hotel._id, code: bookingCode(), guest: guest._id, guestName: guest.name, guestPhone: guest.phone, guestEmail: guest.email,
-      roomType: rt._id, roomTypeName: rt.name, roomsCount: 1, checkIn, checkOut, nights, adults, children,
-      nightlyRates: quote.nightlyRates, currency: hotel.currency, subtotal: quote.subtotal, tax: quote.tax, total: quote.total,
-      advanceDue: advance, amountPaid: 0, amountRefunded: 0, paymentMode, source, specialRequests: request,
-      status: vacated ? 'checked_out' : 'checked_in', assignedRooms: [room._id], checkedInAt,
-      inventoryHeld: !vacated, history: [{ at: createdAt, action: 'created', by: source === 'admin' ? 'admin:desk' : source, note: advance ? `Awaiting advance of ${advance}` : 'Confirmed without advance' }],
+      hotel: hotel._id,
+      code: bookingCode(),
+      guest: guest._id,
+      guestName: guest.name,
+      guestPhone: guest.phone,
+      guestEmail: guest.email,
+      roomType: rt._id,
+      roomTypeName: rt.name,
+      roomsCount: 1,
+      checkIn,
+      checkOut,
+      nights,
+      adults,
+      children,
+      nightlyRates: quote.nightlyRates,
+      currency: hotel.currency,
+      subtotal: quote.subtotal,
+      tax: quote.tax,
+      total: quote.total,
+      advanceDue: advance,
+      amountPaid: 0,
+      amountRefunded: 0,
+      paymentMode,
+      source,
+      specialRequests: request,
+      status: vacated ? 'checked_out' : 'checked_in',
+      assignedRooms: [room._id],
+      checkedInAt,
+      inventoryHeld: !vacated,
+      history: [
+        {
+          at: createdAt,
+          action: 'created',
+          by: source === 'admin' ? 'admin:desk' : source,
+          note: advance ? `Awaiting advance of ${advance}` : 'Confirmed without advance',
+        },
+      ],
       createdAt,
     });
-    const msg = (template, when, extra) => messages.push({ hotel: hotel._id, booking: b._id, channel: 'whatsapp', to: guest.phone, template, status: 'logged', message: renderMessage(template, hotel, b, extra), createdAt: when, updatedAt: when });
+    const msg = (template, when, extra) =>
+      messages.push({
+        hotel: hotel._id,
+        booking: b._id,
+        channel: 'whatsapp',
+        to: guest.phone,
+        template,
+        status: 'logged',
+        message: renderMessage(template, hotel, b, extra),
+        createdAt: when,
+        updatedAt: when,
+      });
 
     if (advance > 0) {
       const paidAt = minutes(createdAt, 6);
-      const link = { _id: undefined, hotel: hotel._id, booking: b._id, kind: 'charge', purpose: 'advance', provider: config.paymentProvider, method: 'online', amount: advance, currency: hotel.currency, status: 'paid', paidAt, expiresAt: minutes(createdAt, hotel.payment.holdMinutes), providerPaymentId: `pay_seed_${b.code}`, createdAt, updatedAt: paidAt };
+      const link = {
+        _id: undefined,
+        hotel: hotel._id,
+        booking: b._id,
+        kind: 'charge',
+        purpose: 'advance',
+        provider: config.paymentProvider,
+        method: 'online',
+        amount: advance,
+        currency: hotel.currency,
+        status: 'paid',
+        paidAt,
+        expiresAt: minutes(createdAt, hotel.payment.holdMinutes),
+        providerPaymentId: `pay_seed_${b.code}`,
+        createdAt,
+        updatedAt: paidAt,
+      };
       payments.push(link);
       msg('payment_link', createdAt, { amount: advance, url: `${config.publicBaseUrl}/pay/return`, expiresAt: link.expiresAt });
       b.amountPaid = advance;
-      b.history.push({ at: paidAt, action: 'payment_received', by: `payment:${config.paymentProvider}`, note: `${advance} via ${config.paymentProvider}` }, { at: paidAt, action: 'confirmed', by: `payment:${config.paymentProvider}` });
+      b.history.push(
+        {
+          at: paidAt,
+          action: 'payment_received',
+          by: `payment:${config.paymentProvider}`,
+          note: `${advance} via ${config.paymentProvider}`,
+        },
+        { at: paidAt, action: 'confirmed', by: `payment:${config.paymentProvider}` },
+      );
       msg('confirmed', paidAt);
     } else {
       msg('confirmed', createdAt);
@@ -108,11 +174,28 @@ export async function loadTodaySnapshot(hotel) {
       vacatedIndex += 1;
       const due = round2(b.total - b.amountPaid);
       const method = ['upi', 'card', 'cash', 'upi', 'card'][vacatedIndex - 1];
-      payments.push({ hotel: hotel._id, booking: b._id, kind: 'charge', purpose: 'balance', provider: 'offline', method, amount: due, currency: hotel.currency, status: 'paid', paidAt: minutes(outAt, -3), recordedBy: 'admin:desk', createdAt: minutes(outAt, -3), updatedAt: minutes(outAt, -3) });
+      payments.push({
+        hotel: hotel._id,
+        booking: b._id,
+        kind: 'charge',
+        purpose: 'balance',
+        provider: 'offline',
+        method,
+        amount: due,
+        currency: hotel.currency,
+        status: 'paid',
+        paidAt: minutes(outAt, -3),
+        recordedBy: 'admin:desk',
+        createdAt: minutes(outAt, -3),
+        updatedAt: minutes(outAt, -3),
+      });
       b.amountPaid = b.total;
       b.checkedOutAt = outAt;
       b.inventoryReleasedFrom = checkOut;
-      b.history.push({ at: minutes(outAt, -3), action: 'payment_received', by: 'admin:desk', note: `${due} by ${method}` }, { at: outAt, action: 'checked_out', by: 'admin:desk' });
+      b.history.push(
+        { at: minutes(outAt, -3), action: 'payment_received', by: 'admin:desk', note: `${due} by ${method}` },
+        { at: outAt, action: 'checked_out', by: 'admin:desk' },
+      );
     }
     b.updatedAt = b.history[b.history.length - 1].at;
     bookings.push(b);
@@ -133,10 +216,12 @@ export async function loadTodaySnapshot(hotel) {
   // Inventory follows the bookings: every night a booking holds counts against its room type.
   const counts = new Map();
   for (const b of bookings) for (const d of heldNights(b)) counts.set(`${b.roomType}:${d}`, (counts.get(`${b.roomType}:${d}`) || 0) + 1);
-  await Inventory.insertMany([...counts].map(([k, booked]) => {
-    const [roomType, date] = k.split(':');
-    return { hotel: hotel._id, roomType, date, booked };
-  }));
+  await Inventory.insertMany(
+    [...counts].map(([k, booked]) => {
+      const [roomType, date] = k.split(':');
+      return { hotel: hotel._id, roomType, date, booked };
+    }),
+  );
 
   const occupied = IN_HOUSE.map((r) => r[0]);
   const cleaning = VACATED_TODAY.map((r) => r[0]);

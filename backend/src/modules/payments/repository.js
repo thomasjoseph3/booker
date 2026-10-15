@@ -15,7 +15,8 @@ export const list = (hotelId, { status, kind }, page) =>
   });
 
 /** The newest payment link that is still waiting to be paid. */
-export const latestOpenCharge = (bookingId) => Payment.findOne({ booking: bookingId, kind: 'charge', status: 'created' }).sort({ createdAt: -1 });
+export const latestOpenCharge = (bookingId) =>
+  Payment.findOne({ booking: bookingId, kind: 'charge', status: 'created' }).sort({ createdAt: -1 });
 
 export const openCharges = (bookingId) => Payment.find({ booking: bookingId, kind: 'charge', status: 'created' });
 
@@ -31,7 +32,11 @@ export const cancelCharge = (id) => Payment.updateOne({ _id: id, status: 'create
  */
 export const claimAsPaid = ({ paymentId, providerRef, providerPaymentId }) =>
   Payment.findOneAndUpdate(
-    { ...(paymentId ? { _id: paymentId } : { providerRef }), kind: 'charge', status: { $in: ['created', 'expired', 'cancelled', 'failed'] } },
+    {
+      ...(paymentId ? { _id: paymentId } : { providerRef }),
+      kind: 'charge',
+      status: { $in: ['created', 'expired', 'cancelled', 'failed'] },
+    },
     { $set: { status: 'paid', paidAt: new Date(), ...(providerPaymentId ? { providerPaymentId } : {}) } },
     { returnDocument: 'after' },
   );

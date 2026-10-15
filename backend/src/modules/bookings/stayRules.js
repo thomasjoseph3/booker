@@ -10,7 +10,8 @@ export function assertStayDates(hotel, checkIn, checkOut) {
   const today = todayIn(hotel.timezone);
   if (checkIn < today) throw badRequest(`Check-in date ${checkIn} is in the past (today is ${today} at the property)`);
   if (checkIn > addDays(today, 730)) throw badRequest('Bookings can be made up to 2 years in advance');
-  if (nightsBetween(checkIn, checkOut).length > MAX_NIGHTS) throw badRequest(`Stays longer than ${MAX_NIGHTS} nights must be arranged with the front desk`);
+  if (nightsBetween(checkIn, checkOut).length > MAX_NIGHTS)
+    throw badRequest(`Stays longer than ${MAX_NIGHTS} nights must be arranged with the front desk`);
 }
 
 /** Fewest rooms of this type the party fits in (`Infinity` when the type cannot take them at all). */

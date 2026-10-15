@@ -55,7 +55,10 @@ export const razorpayProvider = {
   // Returns a normalized event, or null for events we don't act on. Throws on bad signature.
   parseWebhook(rawBody, headers) {
     const signature = headers['x-razorpay-signature'];
-    const expected = crypto.createHmac('sha256', config.razorpay.webhookSecret || '').update(rawBody).digest('hex');
+    const expected = crypto
+      .createHmac('sha256', config.razorpay.webhookSecret || '')
+      .update(rawBody)
+      .digest('hex');
     if (!signature || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
       throw new ApiError(400, 'BAD_SIGNATURE', 'Invalid Razorpay signature');
     }

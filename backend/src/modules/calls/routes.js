@@ -22,7 +22,12 @@ router.get('/callbacks', validate(pageQuery.extend({ status: z.string().optional
 });
 
 const callbackChanges = z
-  .object({ status: z.enum(['open', 'in_progress', 'done']), assignedTo: z.string().max(120), notes: z.string().max(2000), priority: z.enum(['low', 'normal', 'high']) })
+  .object({
+    status: z.enum(['open', 'in_progress', 'done']),
+    assignedTo: z.string().max(120),
+    notes: z.string().max(2000),
+    priority: z.enum(['low', 'normal', 'high']),
+  })
   .partial();
 
 router.patch('/callbacks/:id', validate(callbackChanges), async (req, res) => {

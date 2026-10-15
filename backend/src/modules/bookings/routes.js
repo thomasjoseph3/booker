@@ -39,10 +39,16 @@ router.get('/bookings/:code/cancellation-quote', async (req, res) => {
   res.json(service.cancellationQuote(req.hotel, await loadBooking(req)));
 });
 
-router.post('/bookings/:code/cancel', validate(z.object({ reason: z.string().max(1000).optional(), waiveFee: z.boolean().default(false) })), async (req, res) => {
-  const { reason, waiveFee } = req.body;
-  res.json(await service.cancelBooking(req.hotel, await loadBooking(req), { reason: reason || 'Cancelled by staff', waiveFee }, req.actor));
-});
+router.post(
+  '/bookings/:code/cancel',
+  validate(z.object({ reason: z.string().max(1000).optional(), waiveFee: z.boolean().default(false) })),
+  async (req, res) => {
+    const { reason, waiveFee } = req.body;
+    res.json(
+      await service.cancelBooking(req.hotel, await loadBooking(req), { reason: reason || 'Cancelled by staff', waiveFee }, req.actor),
+    );
+  },
+);
 
 router.post('/bookings/:code/check-in', validate(z.object({ roomIds: z.array(objectId).optional() })), async (req, res) => {
   res.json(await service.checkInBooking(req.hotel, await loadBooking(req), req.body, req.actor));
@@ -56,7 +62,11 @@ router.post('/bookings/:code/no-show', async (req, res) => {
   res.json(await service.markNoShow(req.hotel, await loadBooking(req), req.actor));
 });
 
-const offlinePayment = z.object({ amount: z.number().positive(), method: z.enum(['cash', 'card', 'upi', 'bank_transfer', 'other']), note: z.string().max(500).optional() });
+const offlinePayment = z.object({
+  amount: z.number().positive(),
+  method: z.enum(['cash', 'card', 'upi', 'bank_transfer', 'other']),
+  note: z.string().max(500).optional(),
+});
 
 router.post('/bookings/:code/payments', validate(offlinePayment), async (req, res) => {
   res.status(201).json(await service.recordOfflinePayment(req.hotel, await loadBooking(req), req.body, req.actor));

@@ -3,7 +3,12 @@ import { DAY_RE } from './utils/dates.js';
 
 export const day = z.string().regex(DAY_RE, 'Use YYYY-MM-DD');
 export const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id');
-export const phone = z.string().trim().min(7).max(20).regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number');
+export const phone = z
+  .string()
+  .trim()
+  .min(7)
+  .max(20)
+  .regex(/^\+?[\d\s\-()]+$/, 'Invalid phone number');
 const optionalEmail = z
   .union([z.email(), z.literal('')])
   .optional()
@@ -112,30 +117,52 @@ const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
 
 export const hotelSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/, 'lowercase letters, digits and dashes'),
+  slug: z
+    .string()
+    .trim()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9-]+$/, 'lowercase letters, digits and dashes'),
   propertyType: z.enum(['hotel', 'resort', 'homestay', 'villa', 'hostel', 'other']).default('hotel'),
   description: z.string().max(5000).optional(),
   starRating: z.number().min(0).max(7).optional(),
   contact: z.object({ phone: z.string().optional(), email: optionalEmail, website: z.string().optional() }).partial().optional(),
   address: z
-    .object({ line1: z.string(), line2: z.string(), city: z.string(), state: z.string(), country: z.string(), postalCode: z.string(), mapsUrl: z.string() })
+    .object({
+      line1: z.string(),
+      line2: z.string(),
+      city: z.string(),
+      state: z.string(),
+      country: z.string(),
+      postalCode: z.string(),
+      mapsUrl: z.string(),
+    })
     .partial()
     .optional(),
-  timezone: z.string().refine((tz) => {
-    try {
-      new Intl.DateTimeFormat('en-US', { timeZone: tz });
-      return true;
-    } catch {
-      return false;
-    }
-  }, 'Unknown timezone').default('Asia/Kolkata'),
+  timezone: z
+    .string()
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Unknown timezone')
+    .default('Asia/Kolkata'),
   currency: z.string().length(3).default('INR'),
   checkInTime: hhmm.default('14:00'),
   checkOutTime: hhmm.default('11:00'),
   phoneNumbers: z.array(z.string()).default([]),
   amenities: z.array(z.string()).default([]),
   policies: z
-    .object({ petsAllowed: z.boolean(), smokingAllowed: z.boolean(), idRequired: z.string(), childPolicy: z.string(), other: z.array(z.string()) })
+    .object({
+      petsAllowed: z.boolean(),
+      smokingAllowed: z.boolean(),
+      idRequired: z.string(),
+      childPolicy: z.string(),
+      other: z.array(z.string()),
+    })
     .partial()
     .optional(),
   faqs: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),

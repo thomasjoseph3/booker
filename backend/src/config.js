@@ -21,7 +21,9 @@ export const config = {
     maxLiveCalls: Number(process.env.MAX_LIVE_CALLS || 5),
     maxLiveMinutes: Number(process.env.MAX_LIVE_MINUTES || 10),
     // Tried in order; later ones are used when an earlier one is rate limited
-    models: [process.env.GEMINI_MODEL || 'gemini-2.5-flash', ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash-lite').split(',')].map((m) => m.trim()).filter(Boolean),
+    models: [process.env.GEMINI_MODEL || 'gemini-2.5-flash', ...(process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash-lite').split(',')]
+      .map((m) => m.trim())
+      .filter(Boolean),
   },
   paymentProvider: process.env.PAYMENT_PROVIDER || 'mock',
   razorpay: {
@@ -37,7 +39,10 @@ export const config = {
   // Guest phone numbers without a "+" prefix are assumed to be in this country
   defaultCountryCode: process.env.DEFAULT_COUNTRY_CODE || '91',
   // Which channels guest messages go out on: comma list of whatsapp,email
-  guestChannels: (process.env.GUEST_CHANNELS || 'whatsapp').split(',').map((c) => c.trim().toLowerCase()).filter(Boolean),
+  guestChannels: (process.env.GUEST_CHANNELS || 'whatsapp')
+    .split(',')
+    .map((c) => c.trim().toLowerCase())
+    .filter(Boolean),
   email: {
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),

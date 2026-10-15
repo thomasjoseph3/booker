@@ -61,9 +61,24 @@ export async function refundBooking(hotel, booking, amount, actor) {
     const take = Math.min(remaining, refundable);
     if (take <= 0) continue;
 
-    const base = { hotel: hotel._id, booking: booking._id, kind: 'refund', purpose: 'refund', amount: take, currency: charge.currency, refundOf: charge._id, recordedBy: actor?.label };
+    const base = {
+      hotel: hotel._id,
+      booking: booking._id,
+      kind: 'refund',
+      purpose: 'refund',
+      amount: take,
+      currency: charge.currency,
+      refundOf: charge._id,
+      recordedBy: actor?.label,
+    };
     if (charge.provider === 'offline') {
-      await repo.create({ ...base, provider: 'offline', method: charge.method, status: 'refund_pending', note: 'Return manually to guest (paid offline)' });
+      await repo.create({
+        ...base,
+        provider: 'offline',
+        method: charge.method,
+        status: 'refund_pending',
+        note: 'Return manually to guest (paid offline)',
+      });
     } else {
       try {
         const result = await getProvider(charge.provider).refund({ payment: charge, amount: take });

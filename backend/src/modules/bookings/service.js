@@ -26,7 +26,11 @@ import { assertOccupancy, assertStayDates } from './stayRules.js';
 const MODIFIABLE = ['pending_payment', 'confirmed'];
 const holdMillis = (hotel) => (hotel.payment?.holdMinutes || 30) * 60 * 1000;
 
-const CONFIRM = (actor, note) => ({ set: { status: 'confirmed' }, unset: { holdExpiresAt: 1 }, history: histEntry('confirmed', actor, note) });
+const CONFIRM = (actor, note) => ({
+  set: { status: 'confirmed' },
+  unset: { holdExpiresAt: 1 },
+  history: histEntry('confirmed', actor, note),
+});
 
 /** Gives the booking's rooms back to inventory (from `fromDay` on, for early departures). Safe to call twice. */
 async function releaseHeld(booking, fromDay) {
@@ -144,7 +148,11 @@ export async function handlePaymentSuccess({ paymentId, providerRef, providerPay
       await reserveInventory(rt, booking.checkIn, booking.checkOut, booking.roomsCount);
       const revived = await repo.transition(
         { _id: booking._id, status: 'expired' },
-        { set: { status: 'confirmed', inventoryHeld: true }, unset: { inventoryReleasedFrom: 1 }, history: histEntry('confirmed', actor, 'Late payment; rooms re-reserved') },
+        {
+          set: { status: 'confirmed', inventoryHeld: true },
+          unset: { inventoryReleasedFrom: 1 },
+          history: histEntry('confirmed', actor, 'Late payment; rooms re-reserved'),
+        },
       );
       if (revived) {
         await notifyGuest(hotel, revived, 'confirmed');
@@ -158,7 +166,11 @@ export async function handlePaymentSuccess({ paymentId, providerRef, providerPay
   }
   if (['expired', 'cancelled'].includes(booking.status)) {
     await refundBooking(hotel, booking, paid, actor);
-    await raiseStaffTask(hotel, booking, `Payment received for ${booking.status} booking ${booking.code}; refunded automatically. Call guest to rebook.`);
+    await raiseStaffTask(
+      hotel,
+      booking,
+      `Payment received for ${booking.status} booking ${booking.code}; refunded automatically. Call guest to rebook.`,
+    );
     await notifyGuest(hotel, booking, 'payment_issue');
   }
   return { processed: true, booking };
@@ -282,7 +294,10 @@ export async function modifyBooking(hotel, booking, changes, actor) {
   assertOccupancy(rt, next.adults, next.children, next.roomsCount);
 
   const stayChanged =
-    String(rt._id) !== String(booking.roomType) || next.checkIn !== booking.checkIn || next.checkOut !== booking.checkOut || next.roomsCount !== booking.roomsCount;
+    String(rt._id) !== String(booking.roomType) ||
+    next.checkIn !== booking.checkIn ||
+    next.checkOut !== booking.checkOut ||
+    next.roomsCount !== booking.roomsCount;
 
   const set = { adults: next.adults, children: next.children };
   if (changes.specialRequests !== undefined) set.specialRequests = changes.specialRequests;
@@ -296,7 +311,11 @@ export async function modifyBooking(hotel, booking, changes, actor) {
     } catch (e) {
       const oldType = await rooms.findTypeById(booking.roomType);
       await reserveInventory(oldType, booking.checkIn, booking.checkOut, booking.roomsCount).catch(() =>
-        raiseStaffTask(hotel, booking, `Inventory for ${booking.code} could not be restored after a failed modification — check for overbooking`),
+        raiseStaffTask(
+          hotel,
+          booking,
+          `Inventory for ${booking.code} could not be restored after a failed modification — check for overbooking`,
+        ),
       );
       throw e;
     }
@@ -347,9 +366,11 @@ export async function modifyBooking(hotel, booking, changes, actor) {
 
 /** Checks a confirmed booking in and assigns physical rooms (the given ones, or the lowest-numbered free ones). */
 export async function checkInBooking(hotel, booking, { roomIds } = {}, actor) {
-  if (booking.status !== 'confirmed') throw conflict('INVALID_STATE', `Only confirmed bookings can be checked in (this one is ${booking.status})`);
+  if (booking.status !== 'confirmed')
+    throw conflict('INVALID_STATE', `Only confirmed bookings can be checked in (this one is ${booking.status})`);
   const today = todayIn(hotel.timezone);
-  if (today < booking.checkIn || today >= booking.checkOut) throw conflict('NOT_ARRIVAL_DAY', `Check-in is allowed from ${booking.checkIn}`);
+  if (today < booking.checkIn || today >= booking.checkOut)
+    throw conflict('NOT_ARRIVAL_DAY', `Check-in is allowed from ${booking.checkIn}`);
 
   let candidates;
   if (roomIds?.length) {
@@ -385,7 +406,11 @@ export async function checkInBooking(hotel, booking, { roomIds } = {}, actor) {
 export async function checkOutBooking(hotel, booking, { force = false } = {}, actor) {
   if (booking.status !== 'checked_in') throw conflict('INVALID_STATE', `Booking is ${booking.status}`);
   if (booking.balanceDue > 0 && !force) {
-    throw conflict('BALANCE_DUE', `Balance of ${hotel.currency} ${booking.balanceDue} is due. Record the payment first or pass force=true.`, { balanceDue: booking.balanceDue });
+    throw conflict(
+      'BALANCE_DUE',
+      `Balance of ${hotel.currency} ${booking.balanceDue} is due. Record the payment first or pass force=true.`,
+      { balanceDue: booking.balanceDue },
+    );
   }
   const updated = await repo.transition(
     { _id: booking._id, status: 'checked_in' },
@@ -404,7 +429,10 @@ export async function checkOutBooking(hotel, booking, { force = false } = {}, ac
 export async function markNoShow(hotel, booking, actor) {
   if (booking.status !== 'confirmed') throw conflict('INVALID_STATE', `Booking is ${booking.status}`);
   if (todayIn(hotel.timezone) < booking.checkIn) throw conflict('NOT_ARRIVAL_DAY', 'Cannot mark no-show before the arrival date');
-  const updated = await repo.transition({ _id: booking._id, status: 'confirmed' }, { set: { status: 'no_show' }, history: histEntry('no_show', actor) });
+  const updated = await repo.transition(
+    { _id: booking._id, status: 'confirmed' },
+    { set: { status: 'no_show' }, history: histEntry('no_show', actor) },
+  );
   if (!updated) throw conflict('INVALID_STATE', 'Booking changed state; please retry');
   await releaseHeld(updated, todayIn(hotel.timezone));
   const fee = round2((updated.total * (hotel.cancellation?.noShowFeePercent ?? 100)) / 100);

@@ -23,7 +23,8 @@ import { runTool } from './toolRunner.js';
 
 const GEMINI_WS = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
 let active = 0;
-const send = (ws, payload) => ws.readyState === WebSocket.OPEN && ws.send(typeof payload === 'string' || Buffer.isBuffer(payload) ? payload : JSON.stringify(payload));
+const send = (ws, payload) =>
+  ws.readyState === WebSocket.OPEN && ws.send(typeof payload === 'string' || Buffer.isBuffer(payload) ? payload : JSON.stringify(payload));
 
 export function attachLiveAgent(server) {
   const wss = new WebSocketServer({ server, path: '/api/live', maxPayload: 512 * 1024 });
@@ -98,31 +99,39 @@ async function handleCall(client, req) {
   const limit = setTimeout(() => end('time_limit'), config.gemini.maxLiveMinutes * 60 * 1000);
 
   upstream.on('open', () => {
-    upstream.send(JSON.stringify({
-      setup: {
-        model: `models/${config.gemini.liveModel}`,
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          temperature: 0.7,
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
+    upstream.send(
+      JSON.stringify({
+        setup: {
+          model: `models/${config.gemini.liveModel}`,
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            temperature: 0.7,
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
+          },
+          systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
+          tools: [{ functionDeclarations: geminiFunctionDeclarations }],
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
         },
-        systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
-        tools: [{ functionDeclarations: geminiFunctionDeclarations }],
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-      },
-    }));
+      }),
+    );
   });
 
   upstream.on('message', async (raw) => {
     let m;
-    try { m = JSON.parse(raw.toString()); } catch { return; }
+    try {
+      m = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
 
     if (m.setupComplete) {
       ready = true;
       for (const chunk of pending.splice(0)) sendAudio(chunk);
       send(client, { type: 'ready', callId });
-      upstream.send(JSON.stringify({ realtimeInput: { text: `[The call has just connected. Greet the caller now by saying: "${greeting}"]` } }));
+      upstream.send(
+        JSON.stringify({ realtimeInput: { text: `[The call has just connected. Greet the caller now by saying: "${greeting}"]` } }),
+      );
       return;
     }
     const sc = m.serverContent;
@@ -141,7 +150,9 @@ async function handleCall(client, req) {
       for (const fc of m.toolCall.functionCalls) {
         const result = await runTool(session, hotel, callId, fc.name, fc.args || {});
         send(client, { type: 'tool', name: fc.name, ok: !result.error });
-        await appendTranscript(hotel._id, callId, [{ role: 'tool', text: `${fc.name}(${JSON.stringify(fc.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}` }]);
+        await appendTranscript(hotel._id, callId, [
+          { role: 'tool', text: `${fc.name}(${JSON.stringify(fc.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}` },
+        ]);
         functionResponses.push({ id: fc.id, name: fc.name, response: { result } });
       }
       upstream.send(JSON.stringify({ toolResponse: { functionResponses } }));
@@ -158,7 +169,8 @@ async function handleCall(client, req) {
   });
   upstream.on('error', (e) => console.error('[live] Gemini socket error:', e.message));
 
-  const sendAudio = (buf) => upstream.send(JSON.stringify({ realtimeInput: { audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
+  const sendAudio = (buf) =>
+    upstream.send(JSON.stringify({ realtimeInput: { audio: { data: buf.toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
 
   client.on('message', (data, isBinary) => {
     if (isBinary) {
@@ -173,7 +185,9 @@ async function handleCall(client, req) {
         void addText('caller', `${msg.text.slice(0, 500)} `);
         upstream.send(JSON.stringify({ realtimeInput: { text: msg.text.slice(0, 500) } }));
       }
-    } catch { /* ignore malformed frames */ }
+    } catch {
+      /* ignore malformed frames */
+    }
   });
   client.on('close', () => void end('hangup'));
   client.on('error', () => void end('error'));

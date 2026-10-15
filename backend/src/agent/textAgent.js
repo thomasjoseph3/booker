@@ -76,14 +76,20 @@ export async function agentTurn(hotel, callId, text) {
       session.contents.push(content); // keep verbatim (includes Gemini's thought signatures)
       const calls = content.parts.filter((p) => p.functionCall);
       if (!calls.length) {
-        reply = content.parts.map((p) => p.text || '').join('').trim();
+        reply = content.parts
+          .map((p) => p.text || '')
+          .join('')
+          .trim();
         break;
       }
       const responses = [];
       for (const { functionCall: call } of calls) {
         const result = await runTool(session, hotel, callId, call.name, call.args || {});
         used.push({ name: call.name, ok: !result.error });
-        entries.push({ role: 'tool', text: `${call.name}(${JSON.stringify(call.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}` });
+        entries.push({
+          role: 'tool',
+          text: `${call.name}(${JSON.stringify(call.args || {})}) → ${result.error ? `ERROR ${result.error}` : 'ok'}`,
+        });
         responses.push({ functionResponse: { name: call.name, response: { result } } });
       }
       session.contents.push({ role: 'user', parts: responses });

@@ -31,7 +31,11 @@ async function api(method, path, { body, headers = {}, expect } = {}) {
   });
   const text = await res.text();
   let data;
-  try { data = JSON.parse(text); } catch { data = text; }
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
   if (expect && res.status !== expect) throw new Error(`${method} ${path} -> ${res.status} (expected ${expect}): ${text.slice(0, 400)}`);
   return { status: res.status, data };
 }
@@ -47,29 +51,54 @@ const caller = '+91 98470 12345';
 let admin, lakesideId, metroId, agent, booking, rtByCode;
 
 await step('admin login + list hotels', async () => {
-  const { data } = await api('POST', '/api/admin/auth/login', { body: { email: 'admin@platform.local', password: 'Admin@123' }, expect: 200 });
+  const { data } = await api('POST', '/api/admin/auth/login', {
+    body: { email: 'admin@platform.local', password: 'Admin@123' },
+    expect: 200,
+  });
   admin = { authorization: `Bearer ${data.token}` };
   const hotels = (await api('GET', '/api/admin/hotels', { headers: admin, expect: 200 })).data.items;
   lakesideId = hotels.find((h) => h.slug === 'lakeside-palms')._id;
 });
 
 await step('onboard a second property through the API (hotel, room type, manager)', async () => {
-  const hotel = (await api('POST', '/api/admin/hotels', {
-    headers: admin,
-    body: { name: 'Metro Grand Hotel', slug: 'metro-grand', propertyType: 'hotel', phoneNumbers: ['+918045000201'], payment: { advanceMode: 'first_night', advancePercent: 0, holdMinutes: 30, allowPayAtHotel: true } },
-    expect: 201,
-  })).data;
+  const hotel = (
+    await api('POST', '/api/admin/hotels', {
+      headers: admin,
+      body: {
+        name: 'Metro Grand Hotel',
+        slug: 'metro-grand',
+        propertyType: 'hotel',
+        phoneNumbers: ['+918045000201'],
+        payment: { advanceMode: 'first_night', advancePercent: 0, holdMinutes: 30, allowPayAtHotel: true },
+      },
+      expect: 201,
+    })
+  ).data;
   metroId = hotel._id;
-  await api('POST', `/api/admin/hotels/${metroId}/room-types`, { headers: admin, body: { name: 'Standard Room', code: 'STD', basePrice: 3200, totalRooms: 8, maxAdults: 2, maxChildren: 1, maxOccupancy: 2 }, expect: 201 });
-  await api('POST', '/api/admin/users', { headers: admin, body: { name: 'Metro Manager', email: 'manager@metrogrand.local', password: 'Admin@123', role: 'hotel_admin', hotels: [metroId] }, expect: 201 });
-  const r = await api('GET', `/api/agent/resolve?number=${encodeURIComponent('+918045000201')}`, { headers: { 'x-api-key': config.agentMasterKey }, expect: 200 });
+  await api('POST', `/api/admin/hotels/${metroId}/room-types`, {
+    headers: admin,
+    body: { name: 'Standard Room', code: 'STD', basePrice: 3200, totalRooms: 8, maxAdults: 2, maxChildren: 1, maxOccupancy: 2 },
+    expect: 201,
+  });
+  await api('POST', '/api/admin/users', {
+    headers: admin,
+    body: { name: 'Metro Manager', email: 'manager@metrogrand.local', password: 'Admin@123', role: 'hotel_admin', hotels: [metroId] },
+    expect: 201,
+  });
+  const r = await api('GET', `/api/agent/resolve?number=${encodeURIComponent('+918045000201')}`, {
+    headers: { 'x-api-key': config.agentMasterKey },
+    expect: 200,
+  });
   assert.equal(r.data.hotelId, metroId);
 });
 
 await step('agent: tools list is public; resolve dialed number with master key', async () => {
   const tools = (await api('GET', '/api/agent/tools', { expect: 200 })).data.tools;
   assert.ok(tools.length >= 10);
-  const r = await api('GET', `/api/agent/resolve?number=${encodeURIComponent('+914842000100')}`, { headers: { 'x-api-key': config.agentMasterKey }, expect: 200 });
+  const r = await api('GET', `/api/agent/resolve?number=${encodeURIComponent('+914842000100')}`, {
+    headers: { 'x-api-key': config.agentMasterKey },
+    expect: 200,
+  });
   assert.equal(r.data.hotelId, lakesideId);
   agent = { 'x-api-key': config.agentMasterKey, 'x-hotel-id': lakesideId, 'x-call-id': 'call-smoke-1' };
   await api('GET', '/api/agent/hotel', { expect: 401 });
@@ -85,7 +114,11 @@ await step('agent: hotel profile + room types', async () => {
 });
 
 await step('agent: availability (2 adults + 1 child) with quote', async () => {
-  const { data } = await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(10), checkOut: d(12), adults: 2, children: 1 }, expect: 200 });
+  const { data } = await api('POST', '/api/agent/availability', {
+    headers: agent,
+    body: { checkIn: d(10), checkOut: d(12), adults: 2, children: 1 },
+    expect: 200,
+  });
   const gc = data.options.find((o) => o.code === 'GC');
   assert.equal(gc.bookable, true);
   assert.equal(gc.availableRooms, 14);
@@ -102,10 +135,29 @@ await step('agent: validation errors are readable', async () => {
 });
 
 await step('agent: create booking -> pending_payment + payment link on WhatsApp', async () => {
-  await api('POST', '/api/agent/calls', { headers: agent, body: { callId: 'call-smoke-1', fromNumber: caller, toNumber: '+914842000100', startedAt: new Date().toISOString(), transcript: [{ role: 'agent', text: 'Namaskaram...' }] }, expect: 200 });
+  await api('POST', '/api/agent/calls', {
+    headers: agent,
+    body: {
+      callId: 'call-smoke-1',
+      fromNumber: caller,
+      toNumber: '+914842000100',
+      startedAt: new Date().toISOString(),
+      transcript: [{ role: 'agent', text: 'Namaskaram...' }],
+    },
+    expect: 200,
+  });
   const { data } = await api('POST', '/api/agent/bookings', {
     headers: agent,
-    body: { roomTypeId: rtByCode.GC._id, checkIn: d(10), checkOut: d(12), adults: 2, children: 1, guest: { name: 'Anjali Menon', phone: caller, email: 'anjali@example.com' }, specialRequests: 'Late arrival ~10pm', callId: 'call-smoke-1' },
+    body: {
+      roomTypeId: rtByCode.GC._id,
+      checkIn: d(10),
+      checkOut: d(12),
+      adults: 2,
+      children: 1,
+      guest: { name: 'Anjali Menon', phone: caller, email: 'anjali@example.com' },
+      specialRequests: 'Late arrival ~10pm',
+      callId: 'call-smoke-1',
+    },
     expect: 201,
   });
   booking = data.booking;
@@ -133,7 +185,11 @@ await step('caller verification: right code + wrong phone is rejected', async ()
 });
 
 await step('agent: modify (extend 1 night) -> repriced + top-up link for extra advance', async () => {
-  const { data } = await api('PATCH', `/api/agent/bookings/${booking.code}`, { headers: agent, body: { phone: caller, checkOut: d(13) }, expect: 200 });
+  const { data } = await api('PATCH', `/api/agent/bookings/${booking.code}`, {
+    headers: agent,
+    body: { phone: caller, checkOut: d(13) },
+    expect: 200,
+  });
   assert.equal(data.booking.nights, 3);
   assert.ok(data.booking.total > booking.total);
   assert.ok(data.booking.paymentLink, 'expected a top-up payment link');
@@ -142,13 +198,24 @@ await step('agent: modify (extend 1 night) -> repriced + top-up link for extra a
 });
 
 await step('agent: cancellation quote (free) then cancel -> full refund, inventory released', async () => {
-  const q = (await api('GET', `/api/agent/bookings/${booking.code}/cancellation-quote?phone=${encodeURIComponent(caller)}`, { headers: agent, expect: 200 })).data;
+  const q = (
+    await api('GET', `/api/agent/bookings/${booking.code}/cancellation-quote?phone=${encodeURIComponent(caller)}`, {
+      headers: agent,
+      expect: 200,
+    })
+  ).data;
   assert.equal(q.freeCancellation, true);
   assert.equal(q.refundAmount, booking.amountPaid);
-  const { data } = await api('POST', `/api/agent/bookings/${booking.code}/cancel`, { headers: agent, body: { phone: caller, reason: 'Plans changed' }, expect: 200 });
+  const { data } = await api('POST', `/api/agent/bookings/${booking.code}/cancel`, {
+    headers: agent,
+    body: { phone: caller, reason: 'Plans changed' },
+    expect: 200,
+  });
   assert.equal(data.booking.status, 'cancelled');
   assert.equal(data.refundAmount, booking.amountPaid);
-  const avail = (await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(10), checkOut: d(13), adults: 2 }, expect: 200 })).data;
+  const avail = (
+    await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(10), checkOut: d(13), adults: 2 }, expect: 200 })
+  ).data;
   assert.equal(avail.options.find((o) => o.code === 'GC').availableRooms, 14);
   await api('POST', `/api/agent/bookings/${booking.code}/cancel`, { headers: agent, body: { phone: caller }, expect: 409 });
 });
@@ -158,12 +225,21 @@ await step('concurrency: 10 simultaneous bookings for 6 Pool Villas -> exactly 6
     Array.from({ length: 10 }, (_, i) =>
       api('POST', '/api/agent/bookings', {
         headers: agent,
-        body: { roomTypeId: rtByCode.PV._id, checkIn: d(20), checkOut: d(23), adults: 2, guest: { name: `Racer ${i}`, phone: `+9190000000${10 + i}` } },
-      })),
+        body: {
+          roomTypeId: rtByCode.PV._id,
+          checkIn: d(20),
+          checkOut: d(23),
+          adults: 2,
+          guest: { name: `Racer ${i}`, phone: `+9190000000${10 + i}` },
+        },
+      }),
+    ),
   );
   assert.equal(results.filter((r) => r.status === 201).length, 6);
   assert.ok(results.filter((r) => r.status !== 201).every((r) => r.data.error.code === 'NO_AVAILABILITY'));
-  const avail = (await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(21), checkOut: d(22), adults: 2 }, expect: 200 })).data;
+  const avail = (
+    await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(21), checkOut: d(22), adults: 2 }, expect: 200 })
+  ).data;
   assert.equal(avail.options.find((o) => o.code === 'PV').availableRooms, 0);
 });
 
@@ -171,13 +247,21 @@ let lateBooking;
 await step('unpaid hold expires and frees rooms; a late payment re-confirms it', async () => {
   const { data } = await api('POST', '/api/agent/bookings', {
     headers: agent,
-    body: { roomTypeId: rtByCode.LV._id, checkIn: d(30), checkOut: d(31), adults: 2, guest: { name: 'Late Payer', phone: '+919111111111' } },
+    body: {
+      roomTypeId: rtByCode.LV._id,
+      checkIn: d(30),
+      checkOut: d(31),
+      adults: 2,
+      guest: { name: 'Late Payer', phone: '+919111111111' },
+    },
     expect: 201,
   });
   lateBooking = data.booking;
   const n = await expireHolds(new Date(Date.now() + 31 * 60 * 1000));
   assert.ok(n >= 1);
-  let avail = (await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(30), checkOut: d(31), adults: 2 }, expect: 200 })).data;
+  let avail = (
+    await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(30), checkOut: d(31), adults: 2 }, expect: 200 })
+  ).data;
   assert.equal(avail.options.find((o) => o.code === 'LV').availableRooms, 10);
   const page = await api('GET', new URL(lateBooking.paymentLink).pathname, { expect: 200 });
   assert.match(page.data, /expired|cancelled/);
@@ -186,16 +270,22 @@ await step('unpaid hold expires and frees rooms; a late payment re-confirms it',
   const { Payment } = await import('../src/models/index.js');
   const p = await Payment.findOne({ paymentUrl: lateBooking.paymentLink });
   await handlePaymentSuccess({ paymentId: p._id });
-  const b = (await api('GET', `/api/agent/bookings?phone=9111111111&code=${lateBooking.code}`, { headers: agent, expect: 200 })).data.bookings[0];
+  const b = (await api('GET', `/api/agent/bookings?phone=9111111111&code=${lateBooking.code}`, { headers: agent, expect: 200 })).data
+    .bookings[0];
   assert.equal(b.status, 'confirmed');
-  avail = (await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(30), checkOut: d(31), adults: 2 }, expect: 200 })).data;
+  avail = (
+    await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(30), checkOut: d(31), adults: 2 }, expect: 200 })
+  ).data;
   assert.equal(avail.options.find((o) => o.code === 'LV').availableRooms, 9);
 });
 
-await step('tenant isolation: another hotel\'s key cannot see this booking', async () => {
+await step("tenant isolation: another hotel's key cannot see this booking", async () => {
   const metroKey = { 'x-api-key': config.agentMasterKey, 'x-hotel-id': metroId };
   await api('GET', `/api/agent/bookings?phone=9111111111&code=${lateBooking.code}`, { headers: metroKey, expect: 404 });
-  const login = await api('POST', '/api/admin/auth/login', { body: { email: 'manager@metrogrand.local', password: 'Admin@123' }, expect: 200 });
+  const login = await api('POST', '/api/admin/auth/login', {
+    body: { email: 'manager@metrogrand.local', password: 'Admin@123' },
+    expect: 200,
+  });
   await api('GET', `/api/admin/hotels/${lakesideId}/bookings`, { headers: { authorization: `Bearer ${login.data.token}` }, expect: 403 });
 });
 
@@ -211,13 +301,27 @@ await step('pay-at-hotel booking at a property that allows it -> confirmed immed
   const rts = (await api('GET', '/api/agent/room-types', { headers: metroKey, expect: 200 })).data.roomTypes;
   const { data } = await api('POST', '/api/agent/bookings', {
     headers: metroKey,
-    body: { roomTypeId: rts[0]._id, checkIn: d(5), checkOut: d(6), adults: 1, guest: { name: 'Rahul', phone: '+919222222222' }, paymentMode: 'pay_at_hotel' },
+    body: {
+      roomTypeId: rts[0]._id,
+      checkIn: d(5),
+      checkOut: d(6),
+      adults: 1,
+      guest: { name: 'Rahul', phone: '+919222222222' },
+      paymentMode: 'pay_at_hotel',
+    },
     expect: 201,
   });
   assert.equal(data.booking.status, 'confirmed');
   await api('POST', '/api/agent/bookings', {
     headers: agent,
-    body: { roomTypeId: rtByCode.GC._id, checkIn: d(5), checkOut: d(6), adults: 1, guest: { name: 'Rahul', phone: '+919222222222' }, paymentMode: 'pay_at_hotel' },
+    body: {
+      roomTypeId: rtByCode.GC._id,
+      checkIn: d(5),
+      checkOut: d(6),
+      adults: 1,
+      guest: { name: 'Rahul', phone: '+919222222222' },
+      paymentMode: 'pay_at_hotel',
+    },
     expect: 400,
   });
 });
@@ -225,42 +329,95 @@ await step('pay-at-hotel booking at a property that allows it -> confirmed immed
 await step('front desk: walk-in today -> check-in (room auto-assigned) -> settle -> check-out', async () => {
   const { data } = await api('POST', `/api/admin/hotels/${lakesideId}/bookings`, {
     headers: admin,
-    body: { roomTypeId: rtByCode.GC._id, checkIn: today, checkOut: d(1), adults: 2, guest: { name: 'Walk In', phone: '+919333333333' }, paymentMode: 'pay_at_hotel', source: 'walk_in' },
+    body: {
+      roomTypeId: rtByCode.GC._id,
+      checkIn: today,
+      checkOut: d(1),
+      adults: 2,
+      guest: { name: 'Walk In', phone: '+919333333333' },
+      paymentMode: 'pay_at_hotel',
+      source: 'walk_in',
+    },
     expect: 201,
   });
   const code = data.booking.code;
-  const ci = (await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/check-in`, { headers: admin, body: {}, expect: 200 })).data;
+  const ci = (await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/check-in`, { headers: admin, body: {}, expect: 200 }))
+    .data;
   assert.equal(ci.status, 'checked_in');
   assert.equal(ci.assignedRooms.length, 1);
   const co = await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/check-out`, { headers: admin, body: {}, expect: 409 });
   assert.equal(co.data.error.code, 'BALANCE_DUE');
-  await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/payments`, { headers: admin, body: { amount: data.booking.total, method: 'upi' }, expect: 201 });
-  const out = (await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/check-out`, { headers: admin, body: {}, expect: 200 })).data;
+  await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/payments`, {
+    headers: admin,
+    body: { amount: data.booking.total, method: 'upi' },
+    expect: 201,
+  });
+  const out = (await api('POST', `/api/admin/hotels/${lakesideId}/bookings/${code}/check-out`, { headers: admin, body: {}, expect: 200 }))
+    .data;
   assert.equal(out.status, 'checked_out');
   const rooms = (await api('GET', `/api/admin/hotels/${lakesideId}/rooms?status=cleaning`, { headers: admin, expect: 200 })).data.items;
   assert.equal(rooms.length, 1);
 });
 
 await step('stop-sell closes a room type for dates', async () => {
-  await api('PUT', `/api/admin/hotels/${lakesideId}/inventory/stop-sell`, { headers: admin, body: { roomTypeId: rtByCode.GC._id, from: d(40), to: d(41), closed: true }, expect: 200 });
-  const avail = (await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(40), checkOut: d(42), adults: 2 }, expect: 200 })).data;
+  await api('PUT', `/api/admin/hotels/${lakesideId}/inventory/stop-sell`, {
+    headers: admin,
+    body: { roomTypeId: rtByCode.GC._id, from: d(40), to: d(41), closed: true },
+    expect: 200,
+  });
+  const avail = (
+    await api('POST', '/api/agent/availability', { headers: agent, body: { checkIn: d(40), checkOut: d(42), adults: 2 }, expect: 200 })
+  ).data;
   assert.equal(avail.options.find((o) => o.code === 'GC').bookable, false);
-  const inv = (await api('GET', `/api/admin/hotels/${lakesideId}/inventory?from=${d(40)}&to=${d(42)}`, { headers: admin, expect: 200 })).data;
-  assert.deepEqual(inv.roomTypes.find((r) => r.name === 'Garden Cottage').days.map((x) => x.closed), [true, true, false]);
+  const inv = (await api('GET', `/api/admin/hotels/${lakesideId}/inventory?from=${d(40)}&to=${d(42)}`, { headers: admin, expect: 200 }))
+    .data;
+  assert.deepEqual(
+    inv.roomTypes.find((r) => r.name === 'Garden Cottage').days.map((x) => x.closed),
+    [true, true, false],
+  );
 });
 
 await step('roles: staff cannot change hotel settings; manager can (nested merge)', async () => {
-  const staff = (await api('POST', '/api/admin/auth/login', { body: { email: 'desk@lakesidepalms.local', password: 'Admin@123' }, expect: 200 })).data.token;
-  await api('PATCH', `/api/admin/hotels/${lakesideId}`, { headers: { authorization: `Bearer ${staff}` }, body: { taxPercent: 5 }, expect: 403 });
-  const mgr = (await api('POST', '/api/admin/auth/login', { body: { email: 'manager@lakesidepalms.local', password: 'Admin@123' }, expect: 200 })).data.token;
-  const h = (await api('PATCH', `/api/admin/hotels/${lakesideId}`, { headers: { authorization: `Bearer ${mgr}` }, body: { payment: { advancePercent: 40 } }, expect: 200 })).data;
+  const staff = (
+    await api('POST', '/api/admin/auth/login', { body: { email: 'desk@lakesidepalms.local', password: 'Admin@123' }, expect: 200 })
+  ).data.token;
+  await api('PATCH', `/api/admin/hotels/${lakesideId}`, {
+    headers: { authorization: `Bearer ${staff}` },
+    body: { taxPercent: 5 },
+    expect: 403,
+  });
+  const mgr = (
+    await api('POST', '/api/admin/auth/login', { body: { email: 'manager@lakesidepalms.local', password: 'Admin@123' }, expect: 200 })
+  ).data.token;
+  const h = (
+    await api('PATCH', `/api/admin/hotels/${lakesideId}`, {
+      headers: { authorization: `Bearer ${mgr}` },
+      body: { payment: { advancePercent: 40 } },
+      expect: 200,
+    })
+  ).data;
   assert.equal(h.payment.advancePercent, 40);
   assert.equal(h.payment.holdMinutes, 30);
 });
 
 await step('agent: callback + call log wrap-up; admin sees them', async () => {
-  await api('POST', '/api/agent/callbacks', { headers: agent, body: { name: 'Anjali', phone: caller, reason: 'Wants a group quote for 12 rooms', priority: 'high', callId: 'call-smoke-1' }, expect: 201 });
-  await api('POST', '/api/agent/calls', { headers: agent, body: { callId: 'call-smoke-1', endedAt: new Date().toISOString(), durationSec: 312, summary: 'Booked, extended, then cancelled; asked for group quote.', outcome: 'callback_requested', transcript: [{ role: 'caller', text: 'Thanks, bye' }] }, expect: 200 });
+  await api('POST', '/api/agent/callbacks', {
+    headers: agent,
+    body: { name: 'Anjali', phone: caller, reason: 'Wants a group quote for 12 rooms', priority: 'high', callId: 'call-smoke-1' },
+    expect: 201,
+  });
+  await api('POST', '/api/agent/calls', {
+    headers: agent,
+    body: {
+      callId: 'call-smoke-1',
+      endedAt: new Date().toISOString(),
+      durationSec: 312,
+      summary: 'Booked, extended, then cancelled; asked for group quote.',
+      outcome: 'callback_requested',
+      transcript: [{ role: 'caller', text: 'Thanks, bye' }],
+    },
+    expect: 200,
+  });
   const calls = (await api('GET', `/api/admin/hotels/${lakesideId}/calls`, { headers: admin, expect: 200 })).data.items;
   const call = (await api('GET', `/api/admin/hotels/${lakesideId}/calls/${calls[0]._id}`, { headers: admin, expect: 200 })).data;
   assert.equal(call.transcript.length, 2);
@@ -282,20 +439,30 @@ await step('admin: dashboard, booking detail with payments/notifications', async
 });
 
 await step('agent: hotel can be addressed by slug', async () => {
-  const h = (await api('GET', '/api/agent/hotel', { headers: { 'x-api-key': config.agentMasterKey, 'x-hotel-id': 'metro-grand' }, expect: 200 })).data;
+  const h = (
+    await api('GET', '/api/agent/hotel', { headers: { 'x-api-key': config.agentMasterKey, 'x-hotel-id': 'metro-grand' }, expect: 200 })
+  ).data;
   assert.equal(h.name, 'Metro Grand Hotel');
   await api('GET', '/api/agent/hotel', { headers: { 'x-api-key': config.agentMasterKey, 'x-hotel-id': 'no-such-hotel' }, expect: 404 });
 });
 
 await step('login is rate limited after repeated failures', async () => {
   const statuses = [];
-  for (let i = 0; i < 11; i += 1) statuses.push((await api('POST', '/api/admin/auth/login', { body: { email: 'brute@force.test', password: 'wrong' } })).status);
-  assert.equal(statuses.slice(0, 10).every((s) => s === 401), true);
+  for (let i = 0; i < 11; i += 1)
+    statuses.push((await api('POST', '/api/admin/auth/login', { body: { email: 'brute@force.test', password: 'wrong' } })).status);
+  assert.equal(
+    statuses.slice(0, 10).every((s) => s === 401),
+    true,
+  );
   assert.equal(statuses[10], 429);
 });
 
 await step('webhook: bad gateway signature is rejected', async () => {
-  const r = await fetch(`${base}/api/payments/webhook/razorpay`, { method: 'POST', headers: { 'x-razorpay-signature': 'nope' }, body: '{}' });
+  const r = await fetch(`${base}/api/payments/webhook/razorpay`, {
+    method: 'POST',
+    headers: { 'x-razorpay-signature': 'nope' },
+    body: '{}',
+  });
   assert.equal(r.status, 400);
 });
 

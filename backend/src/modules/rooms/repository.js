@@ -21,7 +21,8 @@ export const createType = (hotelId, data) => RoomType.create({ ...data, hotel: h
 export const updateType = (hotelId, id, changes) =>
   RoomType.findOneAndUpdate({ _id: id, hotel: hotelId }, { $set: changes }, { returnDocument: 'after', runValidators: true });
 
-export const deactivateType = (hotelId, id) => RoomType.findOneAndUpdate({ _id: id, hotel: hotelId }, { $set: { active: false } }, { returnDocument: 'after' });
+export const deactivateType = (hotelId, id) =>
+  RoomType.findOneAndUpdate({ _id: id, hotel: hotelId }, { $set: { active: false } }, { returnDocument: 'after' });
 
 export const setTotalRooms = (typeId, total) => RoomType.updateOne({ _id: typeId }, { $set: { totalRooms: total } });
 
@@ -47,7 +48,10 @@ export const findAvailableRooms = (hotelId, typeId, limit) =>
 
 /** Puts a guest in the room, only if it is of this type and currently available. Returns false if not. */
 export async function occupyIfAvailable(hotelId, typeId, roomId) {
-  const result = await Room.updateOne({ _id: roomId, hotel: hotelId, roomType: typeId, status: 'available' }, { $set: { status: 'occupied' } });
+  const result = await Room.updateOne(
+    { _id: roomId, hotel: hotelId, roomType: typeId, status: 'available' },
+    { $set: { status: 'occupied' } },
+  );
   return result.modifiedCount === 1;
 }
 

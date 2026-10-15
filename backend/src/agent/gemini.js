@@ -27,5 +27,9 @@ export async function generateContent(body) {
       else break;
     }
   }
-  throw new ApiError(429, 'LLM_RATE_LIMITED', 'The Gemini API quota is used up for now (free keys allow only a few requests per minute). Wait a minute and try again, or enable billing on the key.');
+  throw new ApiError(
+    429,
+    'LLM_RATE_LIMITED',
+    'The Gemini API quota is used up for now (free keys allow only a few requests per minute). Wait a minute and try again, or enable billing on the key.',
+  );
 }

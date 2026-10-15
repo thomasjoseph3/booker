@@ -21,7 +21,10 @@ webhookRouter.post('/:provider', express.raw({ type: '*/*', limit: '1mb' }), asy
 
 export const payPagesRouter = Router();
 
-const page = (title, body) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+const page = (
+  title,
+  body,
+) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title><style>
 body{font-family:system-ui,sans-serif;background:#f4f5f7;margin:0;display:grid;place-items:center;min-height:100vh;color:#1d2433}
 .card{background:#fff;border-radius:14px;padding:28px;max-width:380px;width:calc(100% - 32px);box-shadow:0 4px 20px rgba(0,0,0,.08)}
@@ -37,12 +40,17 @@ payPagesRouter.get('/mock/:id', async (req, res) => {
   if (payment.status !== 'created') {
     return res.send(page('Payment', `<h1>${esc(hotel.name)}</h1><p class="muted">This payment link is ${esc(payment.status)}.</p>`));
   }
-  res.send(page('Pay', `<span class="tag">TEST MODE — no money moves</span>
+  res.send(
+    page(
+      'Pay',
+      `<span class="tag">TEST MODE — no money moves</span>
 <h1>${esc(hotel.name)}</h1><div class="muted">Booking ${esc(booking.code)} · ${esc(booking.guestName)}</div>
 <div class="amt">${esc(money(payment.currency, payment.amount))}</div>
 <div class="row"><span>${esc(booking.roomsCount)} × ${esc(booking.roomTypeName)}</span><span>${esc(booking.nights)} night(s)</span></div>
 <div class="row"><span>${esc(booking.checkIn)} → ${esc(booking.checkOut)}</span><span>Total ${esc(money(booking.currency, booking.total))}</span></div>
-<form method="post" style="margin-top:20px"><button>Pay now</button></form>`));
+<form method="post" style="margin-top:20px"><button>Pay now</button></form>`,
+    ),
+  );
 });
 
 payPagesRouter.post('/mock/:id', async (req, res) => {
@@ -53,7 +61,12 @@ payPagesRouter.post('/mock/:id', async (req, res) => {
 
 payPagesRouter.get('/return', (req, res) => {
   const ok = req.query.status !== 'cancelled';
-  res.send(page('Payment', ok
-    ? '<h1>Payment received ✓</h1><p class="muted">Thank you! Your booking confirmation will arrive by SMS shortly.</p>'
-    : '<h1>Payment not completed</h1><p class="muted">You can use the same link again before it expires, or call the hotel for a new one.</p>'));
+  res.send(
+    page(
+      'Payment',
+      ok
+        ? '<h1>Payment received ✓</h1><p class="muted">Thank you! Your booking confirmation will arrive by SMS shortly.</p>'
+        : '<h1>Payment not completed</h1><p class="muted">You can use the same link again before it expires, or call the hotel for a new one.</p>',
+    ),
+  );
 });

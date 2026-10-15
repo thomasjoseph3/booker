@@ -13,12 +13,20 @@ import * as repo from './repository.js';
  */
 
 const money = (hotel, n) => `${hotel.currency} ${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-const prettyDay = (day) => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const prettyDay = (day) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 const time12 = (hhmm) => {
   const [h, m] = hhmm.split(':').map(Number);
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 };
-const addressLine = (h) => [h.address?.line1, h.address?.line2, h.address?.city, h.address?.state, h.address?.postalCode].filter(Boolean).join(', ');
+const addressLine = (h) =>
+  [h.address?.line1, h.address?.line2, h.address?.city, h.address?.state, h.address?.postalCode].filter(Boolean).join(', ');
 const mapsLink = (h) => h.address?.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(`${h.name}, ${addressLine(h)}`)}`;
 const paidNet = (b) => (b.amountPaid || 0) - (b.amountRefunded || 0);
 
@@ -68,7 +76,20 @@ const templates = {
     ];
     return {
       text: lines.filter((l) => l !== null).join('\n'),
-      params: [b.guestName, h.name, b.code, b.roomTypeName, b.checkIn, time12(h.checkInTime), b.checkOut, time12(h.checkOutTime), money(h, paidNet(b)), money(h, balance), addressLine(h), mapsLink(h)],
+      params: [
+        b.guestName,
+        h.name,
+        b.code,
+        b.roomTypeName,
+        b.checkIn,
+        time12(h.checkInTime),
+        b.checkOut,
+        time12(h.checkOutTime),
+        money(h, paidNet(b)),
+        money(h, balance),
+        addressLine(h),
+        mapsLink(h),
+      ],
     };
   },
 
@@ -78,7 +99,12 @@ const templates = {
   }),
 
   cancelled: (h, b, x) => ({
-    text: `*${h.name}*\n\nBooking *${b.code}* has been cancelled.` + (x.refundAmount > 0 ? `\nA refund of *${money(h, x.refundAmount)}* has been initiated to your original payment method (5–7 working days).` : '') + '\n\nWe hope to host you another time.',
+    text:
+      `*${h.name}*\n\nBooking *${b.code}* has been cancelled.` +
+      (x.refundAmount > 0
+        ? `\nA refund of *${money(h, x.refundAmount)}* has been initiated to your original payment method (5–7 working days).`
+        : '') +
+      '\n\nWe hope to host you another time.',
     params: [b.guestName, h.name, b.code, money(h, x.refundAmount || 0)],
   }),
 
@@ -122,7 +148,11 @@ export async function notifyGuest(hotel, booking, template, extra = {}) {
   // Nobody got the important messages -> ask the front desk to share it manually.
   if (critical && !results.some((r) => r.status !== 'failed')) {
     const err = results.map((r) => r.error).filter(Boolean)[0] || 'no delivery channel available';
-    await raiseStaffTask(hotel, booking, `"${template.replace('_', ' ')}" for ${booking.code} could not be delivered (${err}). Share it with the guest manually.`);
+    await raiseStaffTask(
+      hotel,
+      booking,
+      `"${template.replace('_', ' ')}" for ${booking.code} could not be delivered (${err}). Share it with the guest manually.`,
+    );
   }
   return message.text;
 }

@@ -26,13 +26,29 @@ const property = {
   starRating: 4,
   description: 'Backwater resort on Vembanad Lake with private lawns, an infinity pool, Ayurvedic spa and houseboat cruises.',
   contact: { phone: '+914842000111', email: 'reservations@lakesidepalms.example', website: 'https://lakesidepalms.example' },
-  address: { line1: 'Kumarakom North', city: 'Kottayam', state: 'Kerala', country: 'India', postalCode: '686563', mapsUrl: 'https://maps.google.com/?q=Kumarakom+Kerala' },
+  address: {
+    line1: 'Kumarakom North',
+    city: 'Kottayam',
+    state: 'Kerala',
+    country: 'India',
+    postalCode: '686563',
+    mapsUrl: 'https://maps.google.com/?q=Kumarakom+Kerala',
+  },
   timezone: 'Asia/Kolkata',
   currency: 'INR',
   checkInTime: '14:00',
   checkOutTime: '11:00',
   phoneNumbers: ['+914842000100'],
-  amenities: ['Infinity pool', 'Ayurvedic spa', 'Multi-cuisine restaurant', 'Free Wi-Fi', 'Free parking', 'Houseboat cruises (paid)', 'Airport transfer (paid)', 'Kids play area'],
+  amenities: [
+    'Infinity pool',
+    'Ayurvedic spa',
+    'Multi-cuisine restaurant',
+    'Free Wi-Fi',
+    'Free parking',
+    'Houseboat cruises (paid)',
+    'Airport transfer (paid)',
+    'Kids play area',
+  ],
   policies: {
     petsAllowed: false,
     smokingAllowed: false,
@@ -40,9 +56,15 @@ const property = {
     other: ['Breakfast is included in all room rates.', 'Outside food is not permitted in the restaurant.'],
   },
   faqs: [
-    { question: 'How far is the airport?', answer: 'Cochin International Airport is about 2 hours by road. We arrange transfers for INR 3,500 one way.' },
+    {
+      question: 'How far is the airport?',
+      answer: 'Cochin International Airport is about 2 hours by road. We arrange transfers for INR 3,500 one way.',
+    },
     { question: 'Is breakfast included?', answer: 'Yes, a Kerala and continental breakfast buffet is included with every room.' },
-    { question: 'Can we book a houseboat cruise?', answer: 'Yes, 2-hour sunset cruises run daily at 4:30 PM for INR 2,000 per person; the front desk books them.' },
+    {
+      question: 'Can we book a houseboat cruise?',
+      answer: 'Yes, 2-hour sunset cruises run daily at 4:30 PM for INR 2,000 per person; the front desk books them.',
+    },
     { question: 'Is there parking?', answer: 'Yes, free covered parking for all guests.' },
   ],
   taxPercent: 12,
@@ -59,13 +81,59 @@ const range = (prefix, from, to) => Array.from({ length: to - from + 1 }, (_, i)
 
 // 30 rooms: 14 cottages (1st floor), 10 lake villas (2nd), 6 pool villas (3rd)
 const roomTypes = [
-  { name: 'Garden Cottage', code: 'GC', description: 'Cottage facing the tropical garden with a private sit-out.', bedType: 'King', sizeSqft: 380, view: 'Garden', maxAdults: 2, maxChildren: 1, maxOccupancy: 3, amenities: ['AC', 'Smart TV', 'Mini fridge', 'Tea/coffee maker'], basePrice: 6500, weekendPrice: 7500, rooms: range('1', 1, 14) },
-  { name: 'Lake View Villa', code: 'LV', description: 'Spacious villa with floor-to-ceiling windows overlooking the lake and an outdoor shower.', bedType: 'King', sizeSqft: 650, view: 'Lake', maxAdults: 3, maxChildren: 2, maxOccupancy: 4, amenities: ['AC', 'Smart TV', 'Bathtub', 'Private deck', 'Minibar'], basePrice: 11000, weekendPrice: 12500, rateOverrides: [{ from: `${year}-12-20`, to: `${year + 1}-01-02`, price: 16000, label: 'Christmas & New Year peak' }], rooms: range('2', 1, 10) },
-  { name: 'Pool Villa', code: 'PV', description: 'Private villa with its own plunge pool and butler service.', bedType: 'King', sizeSqft: 1100, view: 'Lake & pool', maxAdults: 4, maxChildren: 2, maxOccupancy: 5, amenities: ['AC', 'Private plunge pool', 'Butler', 'Minibar', 'Bathtub'], basePrice: 22000, weekendPrice: 25000, rooms: range('3', 1, 6) },
+  {
+    name: 'Garden Cottage',
+    code: 'GC',
+    description: 'Cottage facing the tropical garden with a private sit-out.',
+    bedType: 'King',
+    sizeSqft: 380,
+    view: 'Garden',
+    maxAdults: 2,
+    maxChildren: 1,
+    maxOccupancy: 3,
+    amenities: ['AC', 'Smart TV', 'Mini fridge', 'Tea/coffee maker'],
+    basePrice: 6500,
+    weekendPrice: 7500,
+    rooms: range('1', 1, 14),
+  },
+  {
+    name: 'Lake View Villa',
+    code: 'LV',
+    description: 'Spacious villa with floor-to-ceiling windows overlooking the lake and an outdoor shower.',
+    bedType: 'King',
+    sizeSqft: 650,
+    view: 'Lake',
+    maxAdults: 3,
+    maxChildren: 2,
+    maxOccupancy: 4,
+    amenities: ['AC', 'Smart TV', 'Bathtub', 'Private deck', 'Minibar'],
+    basePrice: 11000,
+    weekendPrice: 12500,
+    rateOverrides: [{ from: `${year}-12-20`, to: `${year + 1}-01-02`, price: 16000, label: 'Christmas & New Year peak' }],
+    rooms: range('2', 1, 10),
+  },
+  {
+    name: 'Pool Villa',
+    code: 'PV',
+    description: 'Private villa with its own plunge pool and butler service.',
+    bedType: 'King',
+    sizeSqft: 1100,
+    view: 'Lake & pool',
+    maxAdults: 4,
+    maxChildren: 2,
+    maxOccupancy: 5,
+    amenities: ['AC', 'Private plunge pool', 'Butler', 'Minibar', 'Bathtub'],
+    basePrice: 22000,
+    weekendPrice: 25000,
+    rooms: range('3', 1, 6),
+  },
 ];
 
 const apiKey = generateApiKey('hk_lakeside');
-const hotel = await Hotel.create({ ...property, agent: { ...property.agent, apiKeyHash: sha256(apiKey), apiKeyPreview: `${apiKey.slice(0, 14)}…${apiKey.slice(-4)}` } });
+const hotel = await Hotel.create({
+  ...property,
+  agent: { ...property.agent, apiKeyHash: sha256(apiKey), apiKeyPreview: `${apiKey.slice(0, 14)}…${apiKey.slice(-4)}` },
+});
 for (const { rooms, ...rt } of roomTypes) {
   const roomType = await RoomType.create({ ...rt, hotel: hotel._id, totalRooms: rooms.length });
   await Room.insertMany(rooms.map((number) => ({ hotel: hotel._id, roomType: roomType._id, number, floor: number[0] })));
@@ -81,7 +149,10 @@ await AdminUser.create([
 ]);
 
 console.log(`\nSeeded ${hotel.name} (slug: ${hotel.slug}) — ${roomTypes.reduce((s, r) => s + r.rooms.length, 0)} rooms`);
-if (snapshot) console.log(`Today: ${snapshot.inHouse} occupied · ${snapshot.cleaning} being cleaned (checked out this morning) · ${snapshot.free} free`);
+if (snapshot)
+  console.log(
+    `Today: ${snapshot.inHouse} occupied · ${snapshot.cleaning} being cleaned (checked out this morning) · ${snapshot.free} free`,
+  );
 console.log(`\nAdmin logins (password ${password}):`);
 console.log('  manager@lakesidepalms.local   hotel manager');
 console.log('  desk@lakesidepalms.local      front desk');

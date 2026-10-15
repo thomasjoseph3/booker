@@ -10,7 +10,11 @@ import * as service from './service.js';
 export const loginRouter = Router();
 
 // 10 attempts per email+IP per 15 minutes
-const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: (req) => `${req.ip}:${String(req.body?.email || '').toLowerCase()}` });
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  key: (req) => `${req.ip}:${String(req.body?.email || '').toLowerCase()}`,
+});
 
 loginRouter.post('/auth/login', loginLimiter, validate(z.object({ email: z.email(), password: z.string() })), async (req, res) => {
   res.json(await service.login(req.body.email, req.body.password));

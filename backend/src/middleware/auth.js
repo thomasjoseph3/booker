@@ -26,10 +26,12 @@ export async function requireAdmin(req, res, next) {
   next();
 }
 
-export const requireRole = (...roles) => (req, res, next) => {
-  if (!roles.includes(req.user.role)) throw forbidden(`Requires role: ${roles.join(' or ')}`);
-  next();
-};
+export const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (!roles.includes(req.user.role)) throw forbidden(`Requires role: ${roles.join(' or ')}`);
+    next();
+  };
 
 export function canAccessHotel(user, hotelId) {
   return user.role === 'super_admin' || user.hotels.some((h) => String(h) === String(hotelId));

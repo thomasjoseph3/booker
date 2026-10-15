@@ -43,8 +43,16 @@ export function zonedToUtc(day, time, timeZone) {
   const guess = Date.UTC(y, m - 1, d, hh, mm);
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-US', {
-      timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    }).formatToParts(new Date(guess)).map((p) => [p.type, p.value]),
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+      .formatToParts(new Date(guess))
+      .map((p) => [p.type, p.value]),
   );
   const asLocal = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
   return new Date(guess - (asLocal - guess));

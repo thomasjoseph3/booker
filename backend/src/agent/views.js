@@ -91,4 +91,5 @@ export function paymentSentence(hotel, booking, payment) {
 const INTERNAL_FIELDS = ['hotel', '__v', 'createdAt', 'updatedAt'];
 
 /** A room type without bookkeeping fields. */
-export const roomTypeForAgent = (roomType) => Object.fromEntries(Object.entries(roomType).filter(([key]) => !INTERNAL_FIELDS.includes(key)));
+export const roomTypeForAgent = (roomType) =>
+  Object.fromEntries(Object.entries(roomType).filter(([key]) => !INTERNAL_FIELDS.includes(key)));
