@@ -196,11 +196,39 @@ Everything below is under `/api/admin/hotels/:hotelId`:
 | `GET /guests?q`, `GET /guests/:id`, `PATCH /guests/:id` | all | Guests with lifetime stats; profile with bookings and calls; VIP and notes |
 | `GET /calls?outcome`, `GET /calls/:id` | all | Call log and full transcript |
 | `GET /callbacks?status`, `PATCH /callbacks/:id` | all | Hand-off queue `{ status, notes, assignedTo, priority }` |
-| `GET /notifications` | all | Every WhatsApp message sent to guests |
+| `GET /notifications` | all | Every message sent to guests (email and WhatsApp) |
+| `POST /voice/start`, `/voice/turn`, `/voice/end` | all | Browser test call with the text agent (used by the admin "Talk to agent" page) |
 
 ---
 
-## 3. Payments
+## 3. Public API (`/api/public`) and live voice calls
+
+No authentication. Used by the guest website (`site/`).
+
+| Path | Purpose |
+|---|---|
+| `GET /api/public/hotels/:slug` | Property profile: description, address, amenities, FAQs, room types with "from" prices |
+| `WS /api/live?hotel=<slug>&phone=…&email=…` | Real-time voice call with the AI agent (`phone` and `email` optional) |
+
+The WebSocket carries **binary frames for audio** (client to server: PCM 16-bit 16 kHz mono; server to client: PCM 16-bit
+24 kHz mono) and **JSON text frames for events**:
+
+| Direction | Event | Meaning |
+|---|---|---|
+| server → client | `ready` | Connected; the greeting starts |
+| server → client | `transcript {role, text}` | Caption chunk (`caller` or `agent`) |
+| server → client | `tool {name, ok}` | The agent ran a tool |
+| server → client | `interrupt` | The caller spoke over the agent; drop queued audio |
+| server → client | `ended {summary, outcome, durationSec}` | Call finished |
+| server → client | `error {message}` | Could not connect, all lines busy, etc. |
+| client → server | `end` | Hang up |
+| client → server | `text {text}` | A typed message instead of speech |
+
+Limits: `MAX_LIVE_CALLS` concurrent calls, `MAX_LIVE_MINUTES` per call. See [VOICE_AGENT.md](VOICE_AGENT.md).
+
+---
+
+## 4. Payments
 
 | Path | Purpose |
 |---|---|

@@ -23,7 +23,7 @@ existed and is reused unchanged.
 | Browser to backend transport | **WebSocket** with raw PCM audio | Simple, no extra service or account. Uncompressed audio avoids encode and decode delay. |
 | Microphone capture | **Web Audio API + AudioWorklet** | Runs on its own audio thread, so capture does not glitch when the page is busy. |
 | Server WebSocket | **`ws`** npm package | Standard Node WebSocket server and client. |
-| Tool calling | Gemini function calling, tool schemas in `backend/src/agentTools.js` | The model decides when to check availability or book; the backend executes it against the real API. |
+| Tool calling | Gemini function calling, tool schemas in `backend/src/agent/tools.js` | The model decides when to check availability or book; the backend executes it against the real API. |
 | Guest messages | **Nodemailer over SMTP** (Gmail app password for now) | WhatsApp setup was pending; email works immediately. `GUEST_CHANNELS` selects email, WhatsApp or both. |
 | Text-only fallback agent | Gemini REST `generateContent` | Used by the admin "Talk to agent" tester and for call summaries. |
 
@@ -45,14 +45,14 @@ speaker <- scheduled PCM16 24 kHz   <-WS--  (relay + tools + logging) <-- audio,
    to 16 kHz by linear interpolation, converts float samples to 16-bit integers, and posts a 512-sample chunk
    (about 32 ms) to the main thread, which sends it as a binary WebSocket frame.
 4. **Backend accepts the socket** at `ws://host:4000/api/live?hotel=<slug>` (`attachLiveAgent` in
-   `liveAgent.js`, attached to the same HTTP server in `server.js`). It looks up the hotel, enforces
+   `agent/liveAgent.js`, attached to the same HTTP server in `server.js`). It looks up the hotel, enforces
    `MAX_LIVE_CALLS`, creates a `CallLog`, and opens a second WebSocket to Google
    (`...BidiGenerateContent`).
 5. **Setup message** to Gemini (the `setup` object in `liveAgent.js`):
    - `model`: `GEMINI_LIVE_MODEL`
    - `responseModalities: ['AUDIO']` and the prebuilt voice (`GEMINI_LIVE_VOICE`)
-   - `systemInstruction`: built by `systemPrompt()` in `voiceAgent.js` (hotel facts, speaking style, booking rules)
-   - `tools`: function declarations generated from `agentTools.js`
+   - `systemInstruction`: built by `buildSystemPrompt()` in `agent/prompt.js` (hotel facts, speaking style, booking rules)
+   - `tools`: function declarations generated from `agent/tools.js`
    - `inputAudioTranscription` / `outputAudioTranscription`: text of both sides, used for captions and logs
 6. **Greeting.** On `setupComplete` the backend sends a text turn telling the model to say the hotel's greeting.
 7. **Audio relay.** Browser chunks are wrapped as `realtimeInput.audio` (base64, `audio/pcm;rate=16000`) and sent
@@ -63,13 +63,13 @@ speaker <- scheduled PCM16 24 kHz   <-WS--  (relay + tools + logging) <-- audio,
 9. **Interruption (barge-in).** Gemini's voice-activity detection notices the caller talking over the agent and
    sends `serverContent.interrupted`. The backend sends `{type:'interrupt'}`; the browser stops every scheduled
    source immediately.
-10. **Tools.** Gemini sends `toolCall.functionCalls`. The backend runs each via `runTool()` (in `voiceAgent.js`),
+10. **Tools.** Gemini sends `toolCall.functionCalls`. The backend runs each via `runTool()` (in `agent/toolRunner.js`),
     which calls `http://127.0.0.1:4000/api/agent/...` with an in-process key, then returns a `toolResponse`. The
     model reads the result and speaks it. `create_booking` creates the booking, holds the room and sends the
     payment-link email.
 11. **Transcript and logs.** Transcript text chunks are streamed to the browser as captions and written to the
     `CallLog` when the speaker changes.
-12. **End.** On hang up, `finishCall()` computes the outcome (booked, cancelled, inquiry, ...), asks Gemini for a
+12. **End.** On hang up, `finishCall()` (`agent/callRecord.js`) computes the outcome (booked, cancelled, inquiry, ...), asks Gemini for a
     short summary and sentiment, and links created bookings to the call.
 
 ## 4. Protocol between browser and backend
@@ -91,17 +91,21 @@ Binary frames are audio. Text frames are JSON events.
 
 | File | Responsibility |
 |---|---|
-| `backend/src/services/liveAgent.js` | WebSocket server, Gemini Live relay, tool execution, transcript logging |
-| `backend/src/services/voiceAgent.js` | System prompt, `runTool`, `finishCall` summary, plus the text-turn agent used by the admin tester |
-| `backend/src/agentTools.js` | Tool definitions (name, description, JSON schema, which HTTP endpoint implements it) |
-| `backend/src/routes/agent.js` | The booking API the agent uses as tools |
-| `backend/src/routes/public.js` | Unauthenticated hotel info for the website |
-| `backend/src/services/channels/email.js`, `notify.js` | Guest messages by email and/or WhatsApp |
-| `backend/src/config.js` | Environment settings (Gemini models, voice, limits, SMTP) |
+| `backend/src/agent/liveAgent.js` | WebSocket server, Gemini Live relay, tool execution, transcript logging |
+| `backend/src/agent/prompt.js` | System prompt: persona, speaking style, booking rules, property facts |
+| `backend/src/agent/tools.js` | Tool definitions (name, description, JSON schema, which HTTP endpoint implements it) |
+| `backend/src/agent/toolRunner.js` | Turns a model tool call into a call to the agent API |
+| `backend/src/agent/routes.js` | The booking API the agent uses as tools (`/api/agent/*`) |
+| `backend/src/agent/callRecord.js` | Call log: open, append transcript, close with outcome and summary |
+| `backend/src/agent/textAgent.js`, `gemini.js` | Text-turn agent used by the admin tester, and the Gemini REST client |
+| `backend/src/modules/notifications/` | Guest messages by email and/or WhatsApp |
+| `backend/src/modules/public/` | Unauthenticated property info for the website |
 | `site/src/lib/live-call.ts` | Browser audio engine: mic capture, WebSocket, gapless playback, level meter |
 | `site/src/components/call-dialog.tsx` | Call screen: orb, captions, mute, hang up |
 | `site/src/components/property-page.tsx` | Landing page: rooms, amenities, FAQ |
 | `admin/src/app/h/[hotelId]/talk/` | Older text-turn tester inside the admin |
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how the backend is layered.
 
 ## 6. Configuration (`backend/.env`)
 

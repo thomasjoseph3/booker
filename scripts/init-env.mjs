@@ -1,4 +1,4 @@
-// Creates backend/.env and admin/.env.local from the examples, with fresh secrets. Never overwrites.
+// Creates backend/.env, admin/.env.local and site/.env.local from the examples, with fresh secrets. Never overwrites.
 import { randomBytes } from 'node:crypto';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 
@@ -15,3 +15,8 @@ if (!existsSync('admin/.env.local')) {
   copyFileSync('admin/.env.example', 'admin/.env.local');
   console.log('Created admin/.env.local');
 } else console.log('admin/.env.local already exists — left unchanged');
+
+if (!existsSync('site/.env.local')) {
+  copyFileSync('site/.env.example', 'site/.env.local');
+  console.log('Created site/.env.local');
+} else console.log('site/.env.local already exists — left unchanged');

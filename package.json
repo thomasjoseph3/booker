@@ -1,14 +1,16 @@
 {
   "name": "hotel-agent",
   "private": true,
-  "description": "Hotel booking platform: Express + MongoDB API and Next.js admin dashboard",
+  "description": "Hotel booking platform: Express + MongoDB API, Next.js admin dashboard, public guest site and an AI voice receptionist",
   "scripts": {
-    "setup": "npm install && npm --prefix backend install && npm --prefix admin install && node scripts/init-env.mjs",
+    "setup": "npm install && npm --prefix backend install && npm --prefix admin install && npm --prefix site install && node scripts/init-env.mjs",
     "seed": "npm --prefix backend run seed",
-    "dev": "concurrently -k -n api,admin -c blue,magenta \"npm --prefix backend run dev\" \"npm --prefix admin run dev\"",
-    "build": "npm --prefix admin run build",
-    "start": "concurrently -k -n api,admin -c blue,magenta \"npm --prefix backend start\" \"npm --prefix admin start\"",
+    "dev": "concurrently -k -n api,admin,site -c blue,magenta,green \"npm --prefix backend run dev\" \"npm --prefix admin run dev\" \"npm --prefix site run dev\"",
+    "build": "npm --prefix admin run build && npm --prefix site run build",
+    "start": "concurrently -k -n api,admin,site -c blue,magenta,green \"npm --prefix backend start\" \"npm --prefix admin start\" \"npm --prefix site start\"",
     "test": "npm --prefix backend run smoke",
+    "lint": "npm --prefix backend run lint && npm --prefix admin run lint && npm --prefix site run lint",
+    "format": "npm --prefix backend run format",
     "check": "node backend/scripts/check-data.js",
     "demo:call": "npm --prefix backend run demo:call --"
   },
