@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { WebSocket, WebSocketServer } from 'ws';
 import { config } from '../config.js';
-import { Hotel } from '../models/index.js';
+import * as hotels from '../modules/hotels/repository.js';
 import { normalizePhone } from '../utils/misc.js';
 import { appendTranscript, finishCall, openCallLog } from './callRecord.js';
 import { buildSystemPrompt } from './prompt.js';
@@ -40,7 +40,7 @@ export function attachLiveAgent(server) {
 async function handleCall(client, req) {
   const url = new URL(req.url, 'http://x');
   const hotelRef = (url.searchParams.get('hotel') || '').toLowerCase();
-  const hotel = await Hotel.findOne({ slug: hotelRef, active: true });
+  const hotel = await hotels.findActiveBySlug(hotelRef);
   if (!hotel) {
     send(client, { type: 'error', message: 'This property is not available.' });
     return client.close();

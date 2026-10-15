@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { config } from '../config.js';
-import { AdminUser, Hotel } from '../models/index.js';
+import * as users from '../modules/auth/repository.js';
+import * as hotels from '../modules/hotels/repository.js';
 import { forbidden, notFound, unauthorized } from '../utils/errors.js';
 
 export function signToken(user) {
@@ -18,8 +19,8 @@ export async function requireAdmin(req, res, next) {
   } catch {
     throw unauthorized('Invalid or expired token');
   }
-  const user = await AdminUser.findById(payload.sub);
-  if (!user || !user.active) throw unauthorized('User is disabled');
+  const user = await users.findActiveById(payload.sub);
+  if (!user) throw unauthorized('User is disabled');
   req.user = user;
   req.actor = { type: 'admin', label: `admin:${user.email}` };
   next();
@@ -38,7 +39,7 @@ export function canAccessHotel(user, hotelId) {
 export async function loadHotelParam(req, res, next, hotelId) {
   if (!mongoose.isValidObjectId(hotelId)) throw notFound('Hotel');
   if (!canAccessHotel(req.user, hotelId)) throw forbidden('You do not have access to this property');
-  const hotel = await Hotel.findById(hotelId);
+  const hotel = await hotels.findById(hotelId);
   if (!hotel) throw notFound('Hotel');
   req.hotel = hotel;
   next();

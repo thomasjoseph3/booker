@@ -13,4 +13,12 @@ export default [
       'no-var': 'error',
     },
   },
+  {
+    // Layering: only repositories (and db/scripts) may touch Mongoose models.
+    files: ['src/**/*.js'],
+    ignores: ['src/**/repository.js', 'src/models/**', 'src/db.js'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['**/models/*', '**/models'], message: 'Query through the module repository instead of importing models directly.' }] }],
+    },
+  },
 ];

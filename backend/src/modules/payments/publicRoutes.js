@@ -1,10 +1,9 @@
 import express, { Router } from 'express';
-import { config } from '../../config.js';
-import { Booking, Hotel, Payment } from '../../models/index.js';
+import { notFound } from '../../utils/errors.js';
+import { money } from '../../utils/money.js';
 import { handlePaymentExpired, handlePaymentSuccess } from '../bookings/service.js';
 import { getProvider } from './providers/index.js';
-import { money } from '../../utils/money.js';
-import { notFound } from '../../utils/errors.js';
+import { loadMockCheckout } from './service.js';
 
 export const webhookRouter = Router();
 
@@ -33,16 +32,8 @@ button{width:100%;padding:14px;border:0;border-radius:10px;background:#1f6feb;co
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-async function loadMockPayment(id) {
-  if (config.paymentProvider !== 'mock') throw notFound('Page');
-  const payment = await Payment.findOne({ _id: id, provider: 'mock' });
-  if (!payment) throw notFound('Payment');
-  const [booking, hotel] = await Promise.all([Booking.findById(payment.booking), Hotel.findById(payment.hotel)]);
-  return { payment, booking, hotel };
-}
-
 payPagesRouter.get('/mock/:id', async (req, res) => {
-  const { payment, booking, hotel } = await loadMockPayment(req.params.id);
+  const { payment, booking, hotel } = await loadMockCheckout(req.params.id);
   if (payment.status !== 'created') {
     return res.send(page('Payment', `<h1>${esc(hotel.name)}</h1><p class="muted">This payment link is ${esc(payment.status)}.</p>`));
   }
@@ -55,7 +46,7 @@ payPagesRouter.get('/mock/:id', async (req, res) => {
 });
 
 payPagesRouter.post('/mock/:id', async (req, res) => {
-  const { payment } = await loadMockPayment(req.params.id);
+  const { payment } = await loadMockCheckout(req.params.id);
   await handlePaymentSuccess({ paymentId: payment._id, providerPaymentId: `mock_pay_${Date.now()}` });
   res.redirect(303, '/pay/return?status=success');
 });

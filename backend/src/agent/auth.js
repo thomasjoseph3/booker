@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
 import { config } from '../config.js';
-import { Hotel } from '../models/index.js';
+import * as hotels from '../modules/hotels/repository.js';
 import { badRequest, notFound, unauthorized } from '../utils/errors.js';
 import { sha256 } from '../utils/misc.js';
 
@@ -22,12 +21,11 @@ export async function requireAgent(req, res, next) {
     // x-hotel-id accepts the hotel's id or its slug (slugs stay stable across re-seeds/environments)
     const hotelRef = req.get('x-hotel-id');
     if (hotelRef) {
-      const byId = /^[a-f\d]{24}$/i.test(hotelRef) && mongoose.isValidObjectId(hotelRef);
-      req.hotel = await Hotel.findOne({ ...(byId ? { _id: hotelRef } : { slug: hotelRef.toLowerCase() }), active: true });
+      req.hotel = await hotels.findActiveByRef(hotelRef);
       if (!req.hotel) throw notFound('Hotel');
     }
   } else {
-    const hotel = await Hotel.findOne({ 'agent.apiKeyHash': sha256(key), active: true });
+    const hotel = await hotels.findActiveByAgentKeyHash(sha256(key));
     if (!hotel) throw unauthorized('Invalid API key');
     req.hotel = hotel;
     req.agentScope = 'hotel';

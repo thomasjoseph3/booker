@@ -1,4 +1,5 @@
-import { Booking, CallLog } from '../models/index.js';
+import * as bookings from '../modules/bookings/repository.js';
+import * as calls from '../modules/calls/repository.js';
 import { generateContent } from './gemini.js';
 
 /**
@@ -29,7 +30,7 @@ export function openCallLog(hotel, { callId, callerPhone, note, greeting }) {
   const now = new Date();
   const transcript = [{ role: 'system', text: note, at: now }];
   if (greeting) transcript.push({ role: 'agent', text: greeting, at: now });
-  return CallLog.create({
+  return calls.createCall({
     hotel: hotel._id,
     callId,
     direction: 'inbound',
@@ -43,7 +44,7 @@ export function openCallLog(hotel, { callId, callerPhone, note, greeting }) {
 /** Appends transcript lines: `[{ role: 'caller' | 'agent' | 'tool', text }]`. */
 export function appendTranscript(hotelId, callId, entries) {
   const at = new Date();
-  return CallLog.updateOne({ hotel: hotelId, callId }, { $push: { transcript: { $each: entries.map((e) => ({ ...e, at })) } } });
+  return calls.appendTranscript(hotelId, callId, entries.map((e) => ({ ...e, at })));
 }
 
 /** Asks Gemini for a short summary, intent and sentiment. Returns {} if that is not possible. */
@@ -69,7 +70,7 @@ async function summarize(transcript) {
  * @returns {Promise<{callId: string, outcome?: string, summary?: string, durationSec: number}>}
  */
 export async function finishCall(hotel, callId, session) {
-  const call = await CallLog.findOne({ hotel: hotel._id, callId });
+  const call = await calls.findCallByCallId(hotel._id, callId);
   const spoke = call?.transcript?.some((t) => t.role === 'caller');
   const outcome = OUTCOME_BY_TOOL.find(([tool]) => session.tools.has(tool))?.[1] ?? (spoke ? 'inquiry' : 'abandoned');
   const patch = {
@@ -81,9 +82,8 @@ export async function finishCall(hotel, callId, session) {
 
   const update = { $set: patch };
   if (session.bookingCodes.size) {
-    const ids = await Booking.find({ hotel: hotel._id, code: { $in: [...session.bookingCodes] } }).distinct('_id');
-    update.$addToSet = { bookings: { $each: ids } };
+    update.$addToSet = { bookings: { $each: await bookings.idsForCodes(hotel._id, [...session.bookingCodes]) } };
   }
-  const saved = await CallLog.findOneAndUpdate({ hotel: hotel._id, callId }, update, { returnDocument: 'after' });
+  const saved = await calls.updateCall(hotel._id, callId, update);
   return { callId, outcome: saved.outcome, summary: saved.summary, durationSec: saved.durationSec };
 }

@@ -87,3 +87,8 @@ export function paymentSentence(hotel, booking, payment) {
     : '';
   return `I've sent a payment link for ${money(hotel.currency, payment.amount)} ${whereSent(booking)}.${until} If the advance isn't paid by then, the room will be released. As soon as it's paid, you'll receive your confirmation and check-in details there too.`;
 }
+
+const INTERNAL_FIELDS = ['hotel', '__v', 'createdAt', 'updatedAt'];
+
+/** A room type without bookkeeping fields. */
+export const roomTypeForAgent = (roomType) => Object.fromEntries(Object.entries(roomType).filter(([key]) => !INTERNAL_FIELDS.includes(key)));

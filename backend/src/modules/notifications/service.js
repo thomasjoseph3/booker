@@ -1,11 +1,13 @@
-import { Callback, Notification } from '../../models/index.js';
-import { sendWhatsApp } from './channels/whatsapp.js';
-import { emailEnabled, emailRecipient, sendEmail } from './channels/email.js';
 import { config } from '../../config.js';
+import { raiseStaffTask } from '../calls/service.js';
+import { emailEnabled, emailRecipient, sendEmail } from './channels/email.js';
+import { sendWhatsApp } from './channels/whatsapp.js';
+import * as repo from './repository.js';
 
 /**
- * Guest messages. Every message goes to the guest's WhatsApp and is stored in the
- * notifications collection so admins can see exactly what was sent.
+ * Guest messages (payment link, confirmation, cancellation, ...). They go out on the channels listed in
+ * GUEST_CHANNELS (email and/or WhatsApp) and every attempt is stored in the notifications collection,
+ * so admins can see exactly what was sent.
  * Each template returns `text` (free-form) and `params` (ordered variables for an
  * approved WhatsApp template with the same meaning).
  */
@@ -91,6 +93,7 @@ const templates = {
   }),
 };
 
+/** Sends `template` to the guest on every enabled channel and records each attempt. Never throws. */
 export async function notifyGuest(hotel, booking, template, extra = {}) {
   const message = templates[template](hotel, booking, extra);
   const critical = ['payment_link', 'confirmed'].includes(template);
@@ -102,7 +105,7 @@ export async function notifyGuest(hotel, booking, template, extra = {}) {
       result = { status: 'failed', error: e.message };
       console.error(`[notify] ${channel} ${template} to ${to} failed: ${e.message}`);
     }
-    await Notification.create({ hotel: hotel._id, booking: booking._id, channel, to, template, message: message.text, ...result });
+    await repo.record({ hotel: hotel._id, booking: booking._id, channel, to, template, message: message.text, ...result });
     if (process.env.NODE_ENV !== 'test') console.log(`[${channel}:${result.status}] ${template} -> ${to}`);
     return result;
   };
@@ -119,10 +122,7 @@ export async function notifyGuest(hotel, booking, template, extra = {}) {
   // Nobody got the important messages -> ask the front desk to share it manually.
   if (critical && !results.some((r) => r.status !== 'failed')) {
     const err = results.map((r) => r.error).filter(Boolean)[0] || 'no delivery channel available';
-    await Callback.create({
-      hotel: hotel._id, name: booking.guestName, phone: booking.guestPhone, booking: booking._id, priority: 'high', createdBy: 'system',
-      reason: `"${template.replace('_', ' ')}" for ${booking.code} could not be delivered (${err}). Share it with the guest manually.`,
-    });
+    await raiseStaffTask(hotel, booking, `"${template.replace('_', ' ')}" for ${booking.code} could not be delivered (${err}). Share it with the guest manually.`);
   }
   return message.text;
 }
