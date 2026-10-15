@@ -17,7 +17,7 @@ export async function runTool(session, hotel, callId, name, args) {
   }
   if (name === 'request_human_callback') input.callId = callId;
 
-  const { method, path, in: where } = tool.http;
+  const { method, path } = tool.http;
   const url = new URL(path.replace(/\{(\w+)\}/g, (_, k) => encodeURIComponent(input[k] ?? '')), `http://127.0.0.1:${config.port}`);
   const asQuery = method === 'GET';
   if (asQuery) for (const [k, v] of Object.entries(input)) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));

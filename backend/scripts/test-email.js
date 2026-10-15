@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { sendEmail } from '../src/services/channels/email.js';
-import { renderMessage } from '../src/services/notify.js';
+import { sendEmail } from '../src/modules/notifications/channels/email.js';
+import { renderMessage } from '../src/modules/notifications/service.js';
 import { config } from '../src/config.js';
 
 const to = process.argv[2] || config.email.overrideTo || config.email.user;

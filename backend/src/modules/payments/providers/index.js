@@ -1,4 +1,4 @@
-import { config } from '../../config.js';
+import { config } from '../../../config.js';
 import { mockProvider } from './mock.js';
 import { razorpayProvider } from './razorpay.js';
 import { stripeProvider } from './stripe.js';

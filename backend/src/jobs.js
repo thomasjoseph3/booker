@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { expireHolds } from './services/bookings.js';
+import { expireHolds } from './modules/bookings/service.js';
 
 // Single-instance sweeper. With several API instances, run this in one worker (or use a scheduler).
 export function startJobs() {

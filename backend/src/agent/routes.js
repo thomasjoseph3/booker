@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { Booking, Callback, CallLog, Guest, Hotel, RoomType } from '../models/index.js';
-import * as svc from '../services/bookings.js';
+import * as svc from '../modules/bookings/service.js';
 import { forbidden, notFound } from '../utils/errors.js';
 import { money } from '../utils/money.js';
 import { normalizePhone } from '../utils/misc.js';
@@ -84,7 +84,7 @@ router.post('/bookings/:code/cancel', validate(callerSchema.extend({ reason: cal
 
 router.patch('/bookings/:code', validate(callerSchema.extend(modifyBookingSchema.shape)), async (req, res) => {
   const booking = await callerBooking(req);
-  const { phone, ...changes } = req.body;
+  const { phone: _phone, ...changes } = req.body;
   const { booking: updated, payment, refunded } = await svc.modifyBooking(req.hotel, booking, changes, req.actor);
   let sayNext = `Booking ${updated.code} is updated: ${updated.roomsCount} x ${updated.roomTypeName}, ${updated.checkIn} to ${updated.checkOut}, total ${money(updated.currency, updated.total)}.`;
   if (payment) sayNext += ` ${paymentSentence(req.hotel, updated, payment)}`;

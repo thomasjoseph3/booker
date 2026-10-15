@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { Hotel, RoomType } from '../models/index.js';
-import { notFound } from '../utils/errors.js';
+import { Hotel, RoomType } from '../../models/index.js';
+import { notFound } from '../../utils/errors.js';
 
 // Unauthenticated, guest-facing property info for the public website.
 const router = Router();

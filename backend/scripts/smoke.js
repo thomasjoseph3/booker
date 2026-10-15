@@ -13,7 +13,7 @@ execFileSync(process.execPath, ['scripts/seed.js', '--no-demo'], { env: process.
 const { config } = await import('../src/config.js');
 const { connectDb } = await import('../src/db.js');
 const { createApp } = await import('../src/app.js');
-const { expireHolds } = await import('../src/services/bookings.js');
+const { expireHolds } = await import('../src/modules/bookings/service.js');
 const { addDays, todayIn } = await import('../src/utils/dates.js');
 const mongoose = (await import('mongoose')).default;
 
@@ -182,7 +182,7 @@ await step('unpaid hold expires and frees rooms; a late payment re-confirms it',
   const page = await api('GET', new URL(lateBooking.paymentLink).pathname, { expect: 200 });
   assert.match(page.data, /expired|cancelled/);
   // Simulate the gateway reporting a payment that was in flight when the hold lapsed
-  const { handlePaymentSuccess } = await import('../src/services/bookings.js');
+  const { handlePaymentSuccess } = await import('../src/modules/bookings/service.js');
   const { Payment } = await import('../src/models/index.js');
   const p = await Payment.findOne({ paymentUrl: lateBooking.paymentLink });
   await handlePaymentSuccess({ paymentId: p._id });

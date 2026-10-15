@@ -1,4 +1,4 @@
-import { config } from '../../config.js';
+import { config } from '../../../config.js';
 
 // Local/dev provider: the "payment link" is a page on this server with a Pay button.
 export const mockProvider = {

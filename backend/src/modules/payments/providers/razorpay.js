@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { config } from '../../config.js';
-import { ApiError } from '../../utils/errors.js';
+import { config } from '../../../config.js';
+import { ApiError } from '../../../utils/errors.js';
 
 // Razorpay Payment Links: https://razorpay.com/docs/api/payments/payment-links/
 const API = 'https://api.razorpay.com/v1';

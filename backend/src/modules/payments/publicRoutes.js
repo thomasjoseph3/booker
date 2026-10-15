@@ -1,10 +1,10 @@
 import express, { Router } from 'express';
-import { config } from '../config.js';
-import { Booking, Hotel, Payment } from '../models/index.js';
-import { handlePaymentExpired, handlePaymentSuccess } from '../services/bookings.js';
-import { getProvider } from '../services/payments/index.js';
-import { money } from '../utils/money.js';
-import { notFound } from '../utils/errors.js';
+import { config } from '../../config.js';
+import { Booking, Hotel, Payment } from '../../models/index.js';
+import { handlePaymentExpired, handlePaymentSuccess } from '../bookings/service.js';
+import { getProvider } from './providers/index.js';
+import { money } from '../../utils/money.js';
+import { notFound } from '../../utils/errors.js';
 
 export const webhookRouter = Router();
 

@@ -2,8 +2,8 @@
 // checked out this morning, the rest clean and free. Bookings, payments and WhatsApp messages are
 // consistent with that state, and inventory counters are derived from the bookings.
 import { Booking, Guest, Inventory, Notification, Payment, Room, RoomType } from '../src/models/index.js';
-import { renderMessage } from '../src/services/notify.js';
-import { quoteStay } from '../src/services/pricing.js';
+import { renderMessage } from '../src/modules/notifications/service.js';
+import { quoteStay } from '../src/modules/bookings/pricing.js';
 import { addDays, todayIn, zonedToUtc } from '../src/utils/dates.js';
 import { bookingCode, round2 } from '../src/utils/misc.js';
 import { heldNights } from './ledger.js';

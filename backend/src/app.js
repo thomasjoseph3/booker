@@ -6,8 +6,8 @@ import { config } from './config.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import adminRouter from './routes/admin/index.js';
 import { agentRouter } from './agent/index.js';
-import publicRouter from './routes/public.js';
-import { payPagesRouter, webhookRouter } from './routes/payments.js';
+import publicRouter from './modules/public/routes.js';
+import { payPagesRouter, webhookRouter } from './modules/payments/publicRoutes.js';
 
 export function createApp() {
   const app = express();

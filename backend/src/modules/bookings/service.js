@@ -1,10 +1,10 @@
-import { Booking, Callback, Guest, Hotel, Payment, Room, RoomType } from '../models/index.js';
-import { addDays, isValidDay, nightsBetween, todayIn, zonedToUtc } from '../utils/dates.js';
-import { badRequest, conflict, notFound } from '../utils/errors.js';
-import { bookingCode, escapeRegex, normalizePhone, round2, samePhone } from '../utils/misc.js';
-import { availabilityFor, releaseInventory, reserveInventory } from './inventory.js';
-import { notifyGuest } from './notify.js';
-import { getProvider } from './payments/index.js';
+import { Booking, Callback, Guest, Hotel, Payment, Room, RoomType } from '../../models/index.js';
+import { addDays, isValidDay, nightsBetween, todayIn, zonedToUtc } from '../../utils/dates.js';
+import { badRequest, conflict, notFound } from '../../utils/errors.js';
+import { bookingCode, escapeRegex, normalizePhone, round2, samePhone } from '../../utils/misc.js';
+import { availabilityFor, releaseInventory, reserveInventory } from '../inventory/service.js';
+import { notifyGuest } from '../notifications/service.js';
+import { getProvider } from '../payments/providers/index.js';
 import { quoteStay } from './pricing.js';
 
 const MAX_NIGHTS = 30;

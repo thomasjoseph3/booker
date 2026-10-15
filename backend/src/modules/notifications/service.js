@@ -1,7 +1,7 @@
-import { Callback, Notification } from '../models/index.js';
+import { Callback, Notification } from '../../models/index.js';
 import { sendWhatsApp } from './channels/whatsapp.js';
 import { emailEnabled, emailRecipient, sendEmail } from './channels/email.js';
-import { config } from '../config.js';
+import { config } from '../../config.js';
 
 /**
  * Guest messages. Every message goes to the guest's WhatsApp and is stored in the

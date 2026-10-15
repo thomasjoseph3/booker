@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { config } from '../../config.js';
+import { config } from '../../../config.js';
 
 /**
  * Email delivery (SMTP). Works with Gmail (use an App Password), Brevo, SES, Mailtrap, etc.

@@ -1,6 +1,6 @@
-import { Inventory } from '../models/index.js';
-import { conflict } from '../utils/errors.js';
-import { addDays, nightsBetween } from '../utils/dates.js';
+import { Inventory } from '../../models/index.js';
+import { conflict } from '../../utils/errors.js';
+import { addDays, nightsBetween } from '../../utils/dates.js';
 
 async function ensureRows(roomType, nights) {
   await Inventory.bulkWrite(

@@ -5,8 +5,8 @@ import { validate, validatePatch } from '../../middleware/validate.js';
 import {
   BOOKING_STATUSES, Booking, Callback, CallLog, Guest, Inventory, Notification, Payment, Room, RoomType,
 } from '../../models/index.js';
-import { setStopSell } from '../../services/inventory.js';
-import * as svc from '../../services/bookings.js';
+import { setStopSell } from '../../modules/inventory/service.js';
+import * as svc from '../../modules/bookings/service.js';
 import { textAgent } from '../../agent/index.js';
 import { addDays, nightsBetween, todayIn } from '../../utils/dates.js';
 import { badRequest, conflict, notFound } from '../../utils/errors.js';

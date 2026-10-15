@@ -1,5 +1,5 @@
-import { isWeekendNight, nightsBetween } from '../utils/dates.js';
-import { round2 } from '../utils/misc.js';
+import { isWeekendNight, nightsBetween } from '../../utils/dates.js';
+import { round2 } from '../../utils/misc.js';
 
 export function nightlyPrice(roomType, night) {
   // Later overrides win, so admins can layer a specific event on top of a season.

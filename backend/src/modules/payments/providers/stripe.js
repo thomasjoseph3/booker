@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { config } from '../../config.js';
-import { ApiError } from '../../utils/errors.js';
+import { config } from '../../../config.js';
+import { ApiError } from '../../../utils/errors.js';
 
 // Stripe Checkout Sessions: https://docs.stripe.com/api/checkout/sessions
 const API = 'https://api.stripe.com/v1';
