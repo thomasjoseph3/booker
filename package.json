@@ -12,7 +12,8 @@
     "lint": "npm --prefix backend run lint && npm --prefix admin run lint && npm --prefix site run lint",
     "format": "npm --prefix backend run format",
     "check": "node backend/scripts/check-data.js",
-    "demo:call": "npm --prefix backend run demo:call --"
+    "demo:call": "npm --prefix backend run demo:call --",
+    "mcp:token": "npm --prefix backend run mcp:token --"
   },
   "devDependencies": {
     "concurrently": "^9.2.4"

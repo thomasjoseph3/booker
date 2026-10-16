@@ -1,14 +1,14 @@
 import { tool } from '@langchain/core/tools';
 import { config } from '../../config.js';
 import { appendTranscript } from './callRecord.js';
+import { requestAgentApi } from './http.js';
 import { endCallSpec, guestToolSpecs } from './tools.js';
 
 const MAX_LOGGED_RESULT = 3000;
 
 /**
- * Calls the agent's own HTTP API (the same endpoints an external agent runtime would use, so validation, tenant
- * scoping and response shaping live in one place). The caller's phone number and email are filled in when the
- * model leaves them out. Never throws: failures come back as `{ error }`.
+ * Calls the agent's own HTTP API (see http.js) for this call. The caller's phone number and email are filled in when
+ * the model leaves them out. Never throws: failures come back as `{ error }`.
  */
 async function callAgentApi(spec, { session, hotel, callId }, args, fetchImpl) {
   const input = { ...args };
@@ -23,33 +23,17 @@ async function callAgentApi(spec, { session, hotel, callId }, args, fetchImpl) {
   }
   if (spec.name === 'request_human_callback') input.callId = callId;
 
-  const { method, path } = spec.http;
-  const url = new URL(
-    path.replace(/\{(\w+)\}/g, (_, k) => encodeURIComponent(input[k] ?? '')),
-    `http://127.0.0.1:${config.port}`,
+  const data = await requestAgentApi(
+    spec,
+    input,
+    { 'x-api-key': config.internalAgentKey, 'x-hotel-id': String(hotel._id), 'x-call-id': callId },
+    fetchImpl,
   );
-  const asQuery = method === 'GET';
-  if (asQuery) for (const [k, v] of Object.entries(input)) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
-  try {
-    const res = await fetchImpl(url, {
-      method,
-      headers: {
-        'x-api-key': config.internalAgentKey,
-        'x-hotel-id': String(hotel._id),
-        'x-call-id': callId,
-        ...(asQuery ? {} : { 'content-type': 'application/json' }),
-      },
-      body: asQuery ? undefined : JSON.stringify(input),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { error: data?.error?.message || `Request failed (${res.status})`, details: data?.error?.details };
-    session.tools.add(spec.name);
-    const bookingCode = data?.booking?.code;
-    if (bookingCode) session.bookingCodes.add(bookingCode);
-    return data;
-  } catch (e) {
-    return { error: e.message };
-  }
+  if (data.error) return data;
+  session.tools.add(spec.name);
+  const bookingCode = data?.booking?.code;
+  if (bookingCode) session.bookingCodes.add(bookingCode);
+  return data;
 }
 
 /**

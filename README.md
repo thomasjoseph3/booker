@@ -36,6 +36,7 @@ npm run setup     # installs all three apps, creates backend/.env, admin/.env.lo
 npm run seed      # resets the database: one 30-room resort with today's guests (see "Demo data")
 npm run dev       # starts the API (:4000), the admin (:3000) and the guest website (:3001)
 npm run demo:call # in a second terminal: a simulated phone booking through the agent API
+npm run mcp:token -- <email>   # login token for the staff MCP server (see docs/MCP.md)
 ```
 
 Open **http://localhost:3000** for the admin and **http://localhost:3001** for the guest website. If a port is busy, Next.js picks the next free one and prints it.

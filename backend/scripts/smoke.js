@@ -606,6 +606,64 @@ await step('front desk: a guest still checked in after the departure date is fla
   assert.equal((await dash()).counts.overdueCheckouts, 0);
 });
 
+await step('MCP: the booking server offers the receptionist tools, scoped by the hotel agent key', async () => {
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+  const { guestToolSpecs } = await import('../src/agent/guest/tools.js');
+  const { data } = await api('POST', `/api/admin/hotels/${metroId}/agent-key`, { headers: admin, expect: 200 });
+  const connect = async (url, headers) => {
+    const client = new Client({ name: 'smoke', version: '1' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers } }));
+    return client;
+  };
+  const client = await connect(`${base}/mcp/booking`, { 'x-api-key': data.apiKey });
+  const names = (await client.listTools()).tools.map((t) => t.name).sort();
+  assert.deepEqual(names, guestToolSpecs.map((t) => t.name).sort());
+  const info = await client.callTool({ name: 'get_hotel_info', arguments: {} });
+  assert.equal(JSON.parse(info.content[0].text).name, 'Metro Grand Hotel', 'the key decides the hotel');
+  const bad = await client.callTool({
+    name: 'check_availability',
+    arguments: { checkIn: '2030-01-05', checkOut: '2030-01-03', adults: 1 },
+  });
+  assert.equal(bad.isError, true, 'API errors come back as tool errors');
+  await client.close();
+  const noKey = await fetch(`${base}/mcp/booking`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(noKey.status, 401);
+  const wrong = await fetch(`${base}/mcp/booking`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': 'nope' },
+    body: '{}',
+  });
+  assert.equal(wrong.status, 401);
+  assert.equal((await fetch(`${base}/mcp/booking`, { headers: { 'x-api-key': data.apiKey } })).status, 405, 'stateless: POST only');
+});
+
+await step('MCP: the staff server is read-only, for one property, and needs a staff login', async () => {
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+  const { staffToolSpecs } = await import('../src/agent/staff/tools.js');
+  const client = new Client({ name: 'smoke', version: '1' });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/staff/${lakesideId}`), { requestInit: { headers: admin } }));
+  assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), staffToolSpecs.map((t) => t.name).sort());
+  const overview = await client.callTool({ name: 'get_overview', arguments: {} });
+  assert.ok(JSON.parse(overview.content[0].text).counts, 'overview has the dashboard counts');
+  const missing = await client.callTool({ name: 'get_booking', arguments: { code: 'NOPE' } });
+  assert.equal(missing.isError, true);
+  await client.close();
+  const post = (path, headers) =>
+    fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: '{}' });
+  assert.equal((await post(`/mcp/staff/${lakesideId}`, {})).status, 401, 'no token');
+  assert.equal(
+    (
+      await post(`/mcp/staff/${metroId}`, {
+        authorization: `Bearer ${(await api('POST', '/api/admin/auth/login', { body: { email: 'manager@lakesidepalms.local', password: 'Admin@123' }, expect: 200 })).data.token}`,
+      })
+    ).status,
+    403,
+    "another property's data is off limits",
+  );
+});
+
 await step('invariant: inventory counters equal the nights every booking holds', async () => {
   const { Booking, Inventory } = await import('../src/models/index.js');
   const { heldNights } = await import('./ledger.js');
