@@ -34,7 +34,7 @@ How the voice call works: [docs/VOICE_AGENT.md](docs/VOICE_AGENT.md).
 cd "hotel agent"
 npm run setup     # installs all three apps, creates backend/.env, admin/.env.local and site/.env.local
 npm run seed      # resets the database: one 30-room resort with today's guests (see "Demo data")
-npm run dev       # starts the API (:4000), the admin (:3000) and the guest website (:3001)
+npm run dev       # starts the API (:4000), the MCP tools server (:4001), the admin (:3000) and the guest website (:3001)
 npm run demo:call # in a second terminal: a simulated phone booking through the agent API
 npm run mcp:token -- <email>   # login token for the staff MCP server (see docs/MCP.md)
 ```

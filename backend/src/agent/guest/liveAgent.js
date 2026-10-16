@@ -9,6 +9,7 @@ import { isBadKey, isRateLimit } from '../shared/model.js';
 import { geminiDeclarations } from '../shared/schema.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
+import { connectCallTools } from './mcpClient.js';
 import { buildGuestTools, invokeGuestTool } from './toolRunner.js';
 
 /**
@@ -68,7 +69,17 @@ async function handleCall(client, req) {
   const session = createSession({ callerPhone, callerEmail: /^\S+@\S+\.\S+$/.test(callerEmail) ? callerEmail : undefined });
   await openCallLog(hotel, { callId, callerPhone, note: 'Website call', channel: 'web_live', model: config.gemini.liveModel });
 
-  const guestTools = buildGuestTools({ session, hotel, callId });
+  let mcp;
+  try {
+    mcp = await connectCallTools({ hotel, callId, callerPhone, callerEmail: session.callerEmail });
+  } catch (e) {
+    console.error('[live] MCP server unavailable:', e.message);
+    await logCallError(hotel._id, callId, 'The tools server (MCP) is not reachable, so the call was not connected', { detail: e.message });
+    active--;
+    send(client, { type: 'error', message: 'The call could not be connected.' });
+    return client.close();
+  }
+  const guestTools = buildGuestTools({ session, hotel, callId }, { client: mcp });
   const keys = keyPool.prefer(keyPool.rotated(), 'live'); // tried in turn if one is out of quota
   let upstream;
   let ready = false;
@@ -101,6 +112,7 @@ async function handleCall(client, req) {
     active--;
     clearTimeout(limit);
     await flush().catch(() => {});
+    await mcp.close().catch(() => {});
     if (upstream.readyState <= WebSocket.OPEN) upstream.close();
     let result = {};
     try {

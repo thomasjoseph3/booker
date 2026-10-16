@@ -19,5 +19,5 @@ if (!user) {
 const token = jwt.sign({ sub: String(user._id), role: user.role }, config.jwtSecret, { expiresIn: `${Number(days)}d` });
 const hotels = await Hotel.find(user.role === 'super_admin' ? {} : { _id: { $in: user.hotels } }).select('name');
 console.log(`Token for ${user.email} (${user.role}), valid ${days} days. Treat it like a password.\n\n${token}\n`);
-for (const h of hotels) console.log(`${h.name}:  http://localhost:${config.port}/mcp/staff/${h._id}`);
+for (const h of hotels) console.log(`${h.name}:  http://localhost:${config.mcp.port}/mcp/staff/${h._id}`);
 await mongoose.disconnect();

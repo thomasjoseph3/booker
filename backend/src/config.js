@@ -21,6 +21,21 @@ export const config = {
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || `http://localhost:${port}`).replace(/\/$/, ''),
   adminUrl: process.env.ADMIN_URL || 'http://localhost:3000',
   agentMasterKey: process.env.AGENT_MASTER_KEY || '',
+  // The MCP server runs as its own process (src/mcp/main.js). The voice agent reaches its tools only through it,
+  // with a short-lived token minted per call (see mcp/callToken.js). Both processes read the same .env.
+  mcp: {
+    port: Number(process.env.MCP_PORT || 4001),
+    host: process.env.MCP_HOST || '127.0.0.1', // local only; set deliberately to expose it
+    url: (process.env.MCP_URL || `http://127.0.0.1:${process.env.MCP_PORT || 4001}`).replace(/\/$/, ''),
+    backendUrl: (process.env.MCP_BACKEND_URL || `http://127.0.0.1:${port}`).replace(/\/$/, ''),
+    // Signs the per-call tokens. Defaults to a key derived from JWT_SECRET so existing setups keep working.
+    secret:
+      process.env.MCP_SECRET ||
+      crypto
+        .createHmac('sha256', process.env.JWT_SECRET || 'dev-secret-change-me')
+        .update('mcp-call-token')
+        .digest('hex'),
+  },
   // In-process key the built-in (browser) voice agent uses to call the agent API; regenerated on every boot
   internalAgentKey: crypto.randomBytes(24).toString('hex'),
   gemini: {

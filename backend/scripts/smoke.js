@@ -20,6 +20,10 @@ const mongoose = (await import('mongoose')).default;
 await connectDb();
 const server = createApp().listen(0);
 const base = `http://127.0.0.1:${server.address().port}`;
+// The MCP server is its own process in real life; here it runs next to the API and calls it over HTTP, the same way.
+const { createMcpApp } = await import('../src/mcp/app.js');
+const mcpServer = createMcpApp({ backendUrl: base }).listen(0);
+const mcpBase = `http://127.0.0.1:${mcpServer.address().port}`;
 let passed = 0;
 
 async function api(method, path, { body, headers = {}, expect } = {}) {
@@ -616,7 +620,7 @@ await step('MCP: the booking server offers the receptionist tools, scoped by the
     await client.connect(new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers } }));
     return client;
   };
-  const client = await connect(`${base}/mcp/booking`, { 'x-api-key': data.apiKey });
+  const client = await connect(`${mcpBase}/mcp/booking`, { 'x-api-key': data.apiKey });
   const names = (await client.listTools()).tools.map((t) => t.name).sort();
   assert.deepEqual(names, guestToolSpecs.map((t) => t.name).sort());
   const info = await client.callTool({ name: 'get_hotel_info', arguments: {} });
@@ -627,15 +631,15 @@ await step('MCP: the booking server offers the receptionist tools, scoped by the
   });
   assert.equal(bad.isError, true, 'API errors come back as tool errors');
   await client.close();
-  const noKey = await fetch(`${base}/mcp/booking`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  const noKey = await fetch(`${mcpBase}/mcp/booking`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
   assert.equal(noKey.status, 401);
-  const wrong = await fetch(`${base}/mcp/booking`, {
+  const wrong = await fetch(`${mcpBase}/mcp/booking`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': 'nope' },
     body: '{}',
   });
   assert.equal(wrong.status, 401);
-  assert.equal((await fetch(`${base}/mcp/booking`, { headers: { 'x-api-key': data.apiKey } })).status, 405, 'stateless: POST only');
+  assert.equal((await fetch(`${mcpBase}/mcp/booking`, { headers: { 'x-api-key': data.apiKey } })).status, 405, 'stateless: POST only');
 });
 
 await step('MCP: the staff server is read-only, for one property, and needs a staff login', async () => {
@@ -643,7 +647,9 @@ await step('MCP: the staff server is read-only, for one property, and needs a st
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
   const { staffToolSpecs } = await import('../src/agent/staff/tools.js');
   const client = new Client({ name: 'smoke', version: '1' });
-  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/staff/${lakesideId}`), { requestInit: { headers: admin } }));
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(`${mcpBase}/mcp/staff/${lakesideId}`), { requestInit: { headers: admin } }),
+  );
   assert.deepEqual((await client.listTools()).tools.map((t) => t.name).sort(), staffToolSpecs.map((t) => t.name).sort());
   const overview = await client.callTool({ name: 'get_overview', arguments: {} });
   assert.ok(JSON.parse(overview.content[0].text).counts, 'overview has the dashboard counts');
@@ -651,7 +657,7 @@ await step('MCP: the staff server is read-only, for one property, and needs a st
   assert.equal(missing.isError, true);
   await client.close();
   const post = (path, headers) =>
-    fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: '{}' });
+    fetch(`${mcpBase}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: '{}' });
   assert.equal((await post(`/mcp/staff/${lakesideId}`, {})).status, 401, 'no token');
   assert.equal(
     (
@@ -661,6 +667,71 @@ await step('MCP: the staff server is read-only, for one property, and needs a st
     ).status,
     403,
     "another property's data is off limits",
+  );
+});
+
+await step('MCP: a live call books through its call token, and the model cannot change who the caller is', async () => {
+  const { connectCallTools } = await import('../src/agent/guest/mcpClient.js');
+  const { buildGuestTools, invokeGuestTool } = await import('../src/agent/guest/toolRunner.js');
+  const { createSession } = await import('../src/agent/guest/session.js');
+  const { mintCallToken } = await import('../src/mcp/callToken.js');
+  const { Booking, Hotel } = await import('../src/models/index.js');
+  const hotel = await Hotel.findById(lakesideId);
+  const callId = 'smoke-call-1';
+  const session = createSession({ callerPhone: '+919811100099', callerEmail: 'caller@example.com' });
+  const client = await connectCallTools(
+    { hotel, callId, callerPhone: session.callerPhone, callerEmail: session.callerEmail },
+    { url: mcpBase },
+  );
+  const tools = buildGuestTools({ session, hotel, callId }, { client, log: async () => {} });
+  const from = addDays(todayIn(hotel.timezone), 60);
+  const options = (await invokeGuestTool(tools, 'check_availability', { checkIn: from, checkOut: addDays(from, 2), adults: 2 })).options;
+  assert.ok(options.length && options[0].summary.includes(options[0].name), 'availability carries its price summary');
+  // The model tries to book as someone else, on another call:
+  const made = await invokeGuestTool(tools, 'create_booking', {
+    roomTypeId: options[0].roomTypeId,
+    checkIn: from,
+    checkOut: addDays(from, 2),
+    adults: 2,
+    callId: 'someone-elses-call',
+    guest: { name: 'Voice Caller' },
+  });
+  assert.ok(made.booking?.code, JSON.stringify(made));
+  const saved = await Booking.findOne({ code: made.booking.code });
+  assert.equal(saved.guestPhone, '+919811100099', "the booking is under the caller's own number");
+  assert.equal(saved.guestEmail, 'caller@example.com');
+  assert.equal(saved.callId, callId, 'tied to this call, not the one the model named');
+  assert.ok(session.bookingCodes.has(made.booking.code) && session.tools.has('create_booking'));
+  // Another caller's booking is not reachable by guessing its code:
+  const { data: other } = await api('POST', '/api/agent/bookings', {
+    headers: { 'x-api-key': config.agentMasterKey, 'x-hotel-id': lakesideId },
+    body: {
+      roomTypeId: options[0].roomTypeId,
+      checkIn: from,
+      checkOut: addDays(from, 1),
+      adults: 1,
+      guest: { name: 'Other Guest', phone: '+919822200088' },
+      paymentMode: 'online',
+    },
+    expect: 201,
+  });
+  const peek = await invokeGuestTool(tools, 'find_bookings', { code: other.booking.code });
+  assert.ok(peek.error || !peek.bookings?.length, "another guest's booking stays hidden");
+  await client.close();
+  // Without a valid token nothing runs:
+  const post = (headers) =>
+    fetch(`${mcpBase}/mcp/booking`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: '{}' });
+  const forged = mintCallToken({ hotelId: lakesideId, callId }, 60).slice(0, -3) + 'abc';
+  assert.equal((await post({ authorization: `Bearer ${forged}` })).status, 401, 'forged token');
+  assert.equal(
+    (await post({ authorization: `Bearer ${mintCallToken({ hotelId: lakesideId, callId }, -5)}` })).status,
+    401,
+    'expired token',
+  );
+  assert.equal(
+    (await post({ authorization: `Bearer ${admin.authorization.slice(7)}` })).status,
+    401,
+    'a staff login token is not a call token',
   );
 });
 
@@ -681,5 +752,6 @@ await step('invariant: inventory counters equal the nights every booking holds',
 
 console.log(`\n${passed} checks passed`);
 server.close();
+mcpServer.close();
 await mongoose.connection.dropDatabase();
 await mongoose.disconnect();

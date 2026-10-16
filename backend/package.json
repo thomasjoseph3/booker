@@ -10,6 +10,8 @@
     "seed": "node scripts/seed.js",
     "smoke": "node scripts/smoke.js",
     "demo:call": "node scripts/demo-call.js",
+    "mcp": "node src/mcp/main.js",
+    "mcp:dev": "node --watch src/mcp/main.js",
     "mcp:token": "node scripts/mcp-token.js",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.js\" \"scripts/**/*.js\"",

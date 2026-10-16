@@ -5,9 +5,9 @@
   "scripts": {
     "setup": "npm install && npm --prefix backend install && npm --prefix admin install && npm --prefix site install && node scripts/init-env.mjs",
     "seed": "npm --prefix backend run seed",
-    "dev": "concurrently -k -n api,admin,site -c blue,magenta,green \"npm --prefix backend run dev\" \"npm --prefix admin run dev\" \"npm --prefix site run dev\"",
+    "dev": "concurrently -k -n api,mcp,admin,site -c blue,cyan,magenta,green \"npm --prefix backend run dev\" \"npm --prefix backend run mcp:dev\" \"npm --prefix admin run dev\" \"npm --prefix site run dev\"",
     "build": "npm --prefix admin run build && npm --prefix site run build",
-    "start": "concurrently -k -n api,admin,site -c blue,magenta,green \"npm --prefix backend start\" \"npm --prefix admin start\" \"npm --prefix site start\"",
+    "start": "concurrently -k -n api,mcp,admin,site -c blue,cyan,magenta,green \"npm --prefix backend start\" \"npm --prefix backend run mcp\" \"npm --prefix admin start\" \"npm --prefix site start\"",
     "test": "npm --prefix backend run smoke",
     "lint": "npm --prefix backend run lint && npm --prefix admin run lint && npm --prefix site run lint",
     "format": "npm --prefix backend run format",

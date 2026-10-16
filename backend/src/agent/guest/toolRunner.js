@@ -1,47 +1,40 @@
 import { tool } from '@langchain/core/tools';
-import { config } from '../../config.js';
 import { appendTranscript } from './callRecord.js';
-import { requestAgentApi } from './http.js';
 import { endCallSpec, guestToolSpecs } from './tools.js';
 
 const MAX_LOGGED_RESULT = 3000;
 
 /**
- * Calls the agent's own HTTP API (see http.js) for this call. The caller's phone number and email are filled in when
- * the model leaves them out. Never throws: failures come back as `{ error }`.
+ * Runs one tool through the MCP server and unpacks its answer. The server fills in who the caller is and which call
+ * this is from the call token, so nothing about that is added here. Never throws: failures come back as `{ error }`.
  */
-async function callAgentApi(spec, { session, hotel, callId }, args, fetchImpl) {
-  const input = { ...args };
-  if (input.phone === undefined && session.callerPhone && 'phone' in spec.schema.shape) input.phone = session.callerPhone;
-  if (spec.name === 'create_booking') {
-    input.callId = callId;
-    input.guest = {
-      ...(session.callerPhone ? { phone: session.callerPhone } : {}),
-      ...(session.callerEmail ? { email: session.callerEmail } : {}),
-      ...input.guest,
-    };
+async function callMcp(client, spec, { session }, args) {
+  try {
+    const res = await client.callTool({ name: spec.name, arguments: args });
+    const text = res.content?.find((c) => c.type === 'text')?.text ?? '';
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text || 'The tool returned nothing' };
+    }
+    if (res.isError && !data.error) data = { error: text };
+    if (data.error) return data;
+    session.tools.add(spec.name);
+    const bookingCode = data?.booking?.code;
+    if (bookingCode) session.bookingCodes.add(bookingCode);
+    return data;
+  } catch (e) {
+    return { error: e.message };
   }
-  if (spec.name === 'request_human_callback') input.callId = callId;
-
-  const data = await requestAgentApi(
-    spec,
-    input,
-    { 'x-api-key': config.internalAgentKey, 'x-hotel-id': String(hotel._id), 'x-call-id': callId },
-    fetchImpl,
-  );
-  if (data.error) return data;
-  session.tools.add(spec.name);
-  const bookingCode = data?.booking?.code;
-  if (bookingCode) session.bookingCodes.add(bookingCode);
-  return data;
 }
 
 /**
  * LangChain tools for one call, bound to the caller's session. Every call is recorded in the call log with its
  * arguments, result, outcome and timing, so any call can be replayed and debugged later.
- * `log` and `fetch` can be replaced (the tests do).
+ * `client` is the call's MCP client (see mcpClient.js); `log` can be replaced (the tests do).
  */
-export function buildGuestTools(ctx, { log = appendTranscript, fetch: fetchImpl = globalThis.fetch } = {}) {
+export function buildGuestTools(ctx, { log = appendTranscript, client } = {}) {
   return [...guestToolSpecs, endCallSpec].map((spec) =>
     tool(
       async (args) => {
@@ -49,7 +42,7 @@ export function buildGuestTools(ctx, { log = appendTranscript, fetch: fetchImpl 
         const result =
           spec === endCallSpec
             ? { ok: true, note: 'The call ends now. Do not say anything more.' }
-            : await callAgentApi(spec, ctx, args, fetchImpl);
+            : await callMcp(client, spec, ctx, args);
         const ms = Date.now() - started;
         const text = JSON.stringify(result);
         await log(ctx.hotel._id, ctx.callId, [

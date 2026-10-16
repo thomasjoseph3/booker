@@ -6,7 +6,6 @@ import { config } from './config.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import adminRouter from './routes/admin.js';
 import { agentRouter } from './agent/index.js';
-import mcpRouter from './mcp/routes.js';
 import publicRouter from './modules/public/routes.js';
 import { payPagesRouter, webhookRouter } from './modules/payments/publicRoutes.js';
 
@@ -23,7 +22,6 @@ export function createApp() {
 
   app.get('/health', (req, res) => res.json({ ok: true }));
   app.use('/api/agent', agentRouter);
-  app.use('/mcp', mcpRouter);
   app.use('/api/public', publicRouter);
   app.use('/api/admin', adminRouter);
   app.use('/pay', payPagesRouter);
