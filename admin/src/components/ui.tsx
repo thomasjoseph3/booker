@@ -39,7 +39,7 @@ const TONES: Record<string, string> = {
 
 const STATUS_TONE: Record<string, keyof typeof TONES> = {
   confirmed: "ok", paid: "ok", done: "ok", refunded: "ok", available: "ok", booked: "ok", positive: "ok", sent: "ok",
-  pending_payment: "warn", created: "warn", open: "warn", refund_pending: "warn", cleaning: "warn", high: "bad", callback_requested: "warn",
+  pending_payment: "warn", created: "warn", open: "warn", refund_pending: "warn", cleaning: "warn", high: "bad", normal: "neutral", low: "neutral", callback_requested: "warn",
   cancelled: "bad", expired: "bad", no_show: "bad", failed: "bad", out_of_service: "bad", negative: "bad", abandoned: "neutral",
   checked_in: "info", in_progress: "info", occupied: "info", modified: "info", inquiry: "info",
 };

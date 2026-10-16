@@ -431,6 +431,21 @@ await step('agent: callback + call log wrap-up; admin sees them', async () => {
   assert.ok(cbs.some((c) => c.reason.includes('group quote')));
 });
 
+await step('tickets: type, priority filter, and one ticket per call and type', async () => {
+  const post = (body) => api('POST', '/api/agent/callbacks', { headers: agent, body: { name: 'Ravi', phone: caller, callId: 'call-ticket-1', ...body }, expect: 201 });
+  const first = (await post({ type: 'question', reason: 'Is there a wedding hall?' })).data;
+  const again = (await post({ type: 'question', reason: 'Can it seat 200?', priority: 'high' })).data;
+  assert.equal(first.id, again.id); // same call + type: merged, not duplicated
+  await post({ type: 'complaint', reason: 'Room was not clean', priority: 'high' });
+  const get = (q) => api('GET', `/api/admin/hotels/${lakesideId}/callbacks?${q}`, { headers: admin, expect: 200 }).then((r) => r.data.items);
+  const q = await get('type=question&status=open');
+  assert.equal(q.filter((t) => t.callId === 'call-ticket-1').length, 1);
+  assert.equal(q.find((t) => t.callId === 'call-ticket-1').priority, 'high');
+  assert.match(q.find((t) => t.callId === 'call-ticket-1').reason, /wedding hall[\s\S]*seat 200/);
+  const high = await get('priority=high&status=open');
+  assert.ok(high.every((t) => t.priority === 'high') && high.some((t) => t.type === 'complaint'));
+});
+
 await step('admin: dashboard, booking detail with payments/notifications', async () => {
   const dash = (await api('GET', `/api/admin/hotels/${lakesideId}/dashboard`, { headers: admin, expect: 200 })).data;
   assert.equal(dash.totalRooms, 30);

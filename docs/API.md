@@ -189,6 +189,7 @@ Everything below is under `/api/admin/hotels/:hotelId`:
 | `POST /availability` | all | Same as the agent endpoint |
 | `GET /inventory?from&to` | all | Per room type per night: booked, available, closed (max 92 days) |
 | `PUT /inventory/stop-sell` | managers | `{ roomTypeId, from, to, closed }`. Close or open nights for sale. |
+| `GET/POST /offers`, `PATCH/DELETE /offers/:id` | managers (GET: all) | Percentage offers with conditions (`minNights`, `bookAheadDays`, stay window, `bookUntil`, `roomTypes`). Applied automatically by every quote; the biggest qualifying offer wins (no stacking). Bookings store `discountName/Percent/Amount`. |
 | `GET/POST /room-types`, `PATCH/DELETE /room-types/:id` | managers (GET: all) | Room types, prices, seasonal `rateOverrides`. DELETE deactivates. |
 | `GET/POST /rooms`, `PATCH/DELETE /rooms/:id` | managers (status PATCH: all) | Physical rooms. Rooms that aren't out of service set `totalRooms`. |
 | `GET /payments` | all | Filters `kind`, `status` |

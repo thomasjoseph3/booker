@@ -116,9 +116,10 @@ function RoomTile({ hotelId, room, tz, today }: { hotelId: string; room: Room; t
   const { pending, result, run } = useAction();
   const stay = room.currentStay;
   const last = room.lastStay;
+  const reserved = !stay && room.status !== "out_of_service" ? room.reservedStay : null;
   const vacatedToday = last?.checkedOutAt && last.checkOut === today;
   return (
-    <div className={clsx("flex flex-col rounded-lg border p-2.5", ROOM_TONE[room.status])}>
+    <div className={clsx("flex flex-col rounded-lg border p-2.5", reserved ? "border-accent/40 bg-accent-soft" : ROOM_TONE[room.status])}>
       <div className="flex items-center justify-between">
         <span className="text-base font-semibold">{room.number}</span>
         <span className="text-[11px] text-ink-2">{room.roomType?.name}</span>
@@ -128,6 +129,12 @@ function RoomTile({ hotelId, room, tz, today }: { hotelId: string; room: Room; t
           <>
             <Link href={`/h/${hotelId}/bookings/${stay.code}`} className="font-medium text-ink hover:underline">{stay.guestName}</Link>
             <div>{stay.adults}A{stay.children ? ` ${stay.children}C` : ""} · leaves {stay.checkOut === today ? "today" : shortDay(stay.checkOut)}</div>
+          </>
+        ) : reserved ? (
+          <>
+            <div className="font-semibold text-accent">Reserved{room.status === "cleaning" ? " (being cleaned)" : ""}</div>
+            <Link href={`/h/${hotelId}/bookings/${reserved.code}`} className="font-medium text-ink hover:underline">{reserved.guestName}</Link>
+            <div>{reserved.checkIn <= today ? "arrives today" : `arrives ${shortDay(reserved.checkIn)}`} · not checked in</div>
           </>
         ) : room.status === "cleaning" && last?.checkedOutAt ? (
           <>
@@ -150,7 +157,10 @@ function RoomTile({ hotelId, room, tz, today }: { hotelId: string; room: Room; t
 
 export function RoomsBoard({ hotelId, rooms, types, canManage, tz, today }: { hotelId: string; rooms: Room[]; types: { id: string; name: string }[]; canManage: boolean; tz: string; today: string }) {
   const add = useAction();
-  const counts = rooms.reduce<Record<string, number>>((m, r) => ({ ...m, [r.status]: (m[r.status] ?? 0) + 1 }), {});
+  const counts = rooms.reduce<Record<string, number>>((m, r) => {
+    const k = r.reservedStay && r.status !== "out_of_service" && !r.currentStay ? "reserved" : r.status;
+    return { ...m, [k]: (m[k] ?? 0) + 1 };
+  }, {});
   return (
     <Card title="Housekeeping board" actions={<span className="text-xs text-muted">{Object.entries(counts).map(([k, v]) => `${v} ${label(k)}`).join(" · ")}</span>}>
       {[...new Set(rooms.map((r) => r.floor ?? ""))].map((floor) => (

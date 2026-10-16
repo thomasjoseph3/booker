@@ -50,6 +50,10 @@ export interface Booking {
   checkedOutAt?: string;
   nightlyRates?: { date: string; price: number }[];
   currency: string;
+  subtotalBeforeDiscount?: number;
+  discountName?: string;
+  discountPercent?: number;
+  discountAmount?: number;
   subtotal: number;
   tax: number;
   total: number;
@@ -164,6 +168,7 @@ export interface Room {
   notes?: string;
   currentStay?: RoomStay | null; // guest in the room now
   lastStay?: RoomStay | null; // most recent guest who checked out
+  reservedStay?: RoomStay | null; // confirmed booking for today, not checked in yet
 }
 
 export interface Page<T> { items: T[]; total: number; page: number; pages: number }
@@ -209,4 +214,34 @@ export interface AssistantChat {
   lastMessageAt: string;
   user?: { _id: string; name: string; email: string };
   messages?: ChatMessage[];
+}
+
+export interface Ticket {
+  _id: string;
+  type: string;
+  priority: "low" | "normal" | "high";
+  status: "open" | "in_progress" | "done";
+  name?: string;
+  phone: string;
+  reason: string;
+  booking?: { _id: string; code: string; status: string };
+  callId?: string;
+  assignedTo?: string;
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface Offer {
+  _id: string;
+  name: string;
+  description?: string;
+  percentOff: number;
+  minNights: number;
+  bookAheadDays: number;
+  stayFrom?: string | null;
+  stayTo?: string | null;
+  bookUntil?: string | null;
+  roomTypes: string[];
+  active: boolean;
 }

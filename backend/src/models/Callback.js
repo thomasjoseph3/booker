@@ -8,6 +8,7 @@ const callbackSchema = new Schema(
     hotel: { type: Schema.Types.ObjectId, ref: 'Hotel', required: true },
     name: String,
     phone: { type: String, required: true },
+    type: { type: String, enum: ['callback', 'question', 'complaint', 'booking_help', 'group_booking', 'payment', 'special_request', 'system'], default: 'callback' },
     reason: { type: String, required: true },
     priority: { type: String, enum: ['low', 'normal', 'high'], default: 'normal' },
     booking: { type: Schema.Types.ObjectId, ref: 'Booking' },
@@ -21,5 +22,6 @@ const callbackSchema = new Schema(
 );
 
 callbackSchema.index({ hotel: 1, status: 1, createdAt: -1 });
+callbackSchema.index({ hotel: 1, callId: 1, type: 1 });
 
 export const Callback = mongoose.model('Callback', callbackSchema);

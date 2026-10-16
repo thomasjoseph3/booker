@@ -10,6 +10,7 @@ import hotels from '../modules/hotels/routes.js';
 import inventory from '../modules/inventory/routes.js';
 import notifications from '../modules/notifications/routes.js';
 import payments from '../modules/payments/adminRoutes.js';
+import offers from '../modules/offers/routes.js';
 import rooms from '../modules/rooms/routes.js';
 
 /**
@@ -26,7 +27,7 @@ router.param('hotelId', loadHotelParam);
 router.use(hotels);
 
 const scoped = Router({ mergeParams: true });
-for (const feature of [analytics, rooms, inventory, bookings, payments, guests, calls, notifications, staffAssistantRoutes])
+for (const feature of [analytics, rooms, offers, inventory, bookings, payments, guests, calls, notifications, staffAssistantRoutes])
   scoped.use(feature);
 router.use('/hotels/:hotelId', scoped);
 

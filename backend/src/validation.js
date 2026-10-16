@@ -23,6 +23,19 @@ export const availabilitySchema = z.object({
   roomsCount: count(1, 20).default(1),
 });
 
+const quoteLine = z.object({
+  roomType: z.string().trim().min(1).max(100),
+  adults: count(0, 50).default(1),
+  children: count(0, 50).default(0),
+  roomsCount: count(1, 20).default(1),
+});
+// One room type (top-level fields) or several (`rooms`): the server adds up the grand total.
+export const quoteSchema = z
+  .object({ checkIn: day, checkOut: day, rooms: z.array(quoteLine).min(1).max(6).optional() })
+  .extend(quoteLine.partial().shape)
+  .refine((q) => q.rooms || q.roomType, { message: 'Give a roomType, or a list of rooms' });
+export const calculateSchema = z.object({ expression: z.string().trim().min(1).max(300) });
+
 export const guestSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone,
@@ -58,6 +71,7 @@ export const callbackSchema = z.object({
   name: z.string().max(120).optional(),
   phone,
   reason: z.string().min(3).max(2000),
+  type: z.enum(['callback', 'question', 'complaint', 'booking_help', 'group_booking', 'payment', 'special_request', 'system']).default('callback'),
   priority: z.enum(['low', 'normal', 'high']).default('normal'),
   bookingCode: z.string().max(20).optional(),
   callId: z.string().max(200).optional(),
@@ -104,6 +118,21 @@ export const roomTypeSchema = z.object({
   totalRooms: count(0, 10000),
   active: z.boolean().default(true),
 });
+
+export const offerSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    description: z.string().max(1000).optional(),
+    percentOff: z.number().min(1).max(90),
+    minNights: count(0, 365).default(0),
+    bookAheadDays: count(0, 730).default(0),
+    stayFrom: day.nullable().optional(),
+    stayTo: day.nullable().optional(),
+    bookUntil: day.nullable().optional(),
+    roomTypes: z.array(objectId).default([]),
+    active: z.boolean().default(true),
+  })
+  .refine((o) => !o.stayFrom || !o.stayTo || o.stayFrom <= o.stayTo, { message: 'The stay window must end after it starts', path: ['stayTo'] });
 
 export const roomSchema = z.object({
   roomTypeId: objectId,

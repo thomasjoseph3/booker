@@ -17,7 +17,7 @@ router.get('/calls/:id', async (req, res) => {
   res.json(call);
 });
 
-router.get('/callbacks', validate(pageQuery.extend({ status: z.string().optional() }), 'query'), async (req, res) => {
+router.get('/callbacks', validate(pageQuery.extend({ status: z.string().optional(), priority: z.string().optional(), type: z.string().optional() }), 'query'), async (req, res) => {
   res.json(await service.listCallbacks(req.hotel._id, req.q, req.q));
 });
 
@@ -27,6 +27,7 @@ const callbackChanges = z
     assignedTo: z.string().max(120),
     notes: z.string().max(2000),
     priority: z.enum(['low', 'normal', 'high']),
+    type: z.enum(['callback', 'question', 'complaint', 'booking_help', 'group_booking', 'payment', 'special_request', 'system']),
   })
   .partial();
 

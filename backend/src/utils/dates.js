@@ -32,8 +32,12 @@ export function isWeekendNight(day) {
   return dow === 5 || dow === 6;
 }
 
+export function dayIn(date, timeZone) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
 export function todayIn(timeZone) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  return dayIn(new Date(), timeZone);
 }
 
 // Converts a local wall-clock time in `timeZone` to a UTC Date.

@@ -1,4 +1,4 @@
-import { todayIn, zonedToUtc } from '../../utils/dates.js';
+import { dayIn, todayIn, zonedToUtc } from '../../utils/dates.js';
 import { badRequest, conflict, notFound } from '../../utils/errors.js';
 import { round2, samePhone } from '../../utils/misc.js';
 import * as callsRepo from '../calls/repository.js';
@@ -6,6 +6,7 @@ import { raiseStaffTask } from '../calls/service.js';
 import { upsertGuest } from '../guests/service.js';
 import * as hotels from '../hotels/repository.js';
 import { releaseInventory, reserveInventory } from '../inventory/service.js';
+import * as offersRepo from '../offers/repository.js';
 import * as notificationsRepo from '../notifications/repository.js';
 import { notifyGuest } from '../notifications/service.js';
 import * as paymentsRepo from '../payments/repository.js';
@@ -58,7 +59,8 @@ export async function createBooking(hotel, input, actor) {
   if (paymentMode === 'pay_at_hotel' && !hotel.payment?.allowPayAtHotel && actor.type !== 'admin') {
     throw badRequest('This property requires an advance payment to confirm bookings');
   }
-  const quote = quoteStay(hotel, rt, { checkIn, checkOut, roomsCount });
+  const bookedOn = todayIn(hotel.timezone);
+  const quote = quoteStay(hotel, rt, { checkIn, checkOut, roomsCount }, { offers: await offersRepo.listActive(hotel._id, bookedOn), bookedOn });
   const needsPayment = paymentMode === 'online' && quote.advanceDue > 0;
   const guest = await upsertGuest(hotel, input.guest);
 
@@ -82,6 +84,10 @@ export async function createBooking(hotel, input, actor) {
       children,
       nightlyRates: quote.nightlyRates,
       currency: quote.currency,
+      subtotalBeforeDiscount: quote.subtotalBeforeDiscount,
+      discountName: quote.discount?.name,
+      discountPercent: quote.discount?.percent,
+      discountAmount: quote.discount?.amount,
       subtotal: quote.subtotal,
       tax: quote.tax,
       total: quote.total,
@@ -319,7 +325,9 @@ export async function modifyBooking(hotel, booking, changes, actor) {
       );
       throw e;
     }
-    const quote = quoteStay(hotel, rt, next);
+    // Offers are judged on the day the guest booked, so changing the dates cannot lose (or newly win) an offer by timing.
+    const bookedOn = dayIn(booking.createdAt, hotel.timezone);
+    const quote = quoteStay(hotel, rt, next, { offers: await offersRepo.listActive(hotel._id, bookedOn), bookedOn });
     Object.assign(set, {
       roomType: rt._id,
       roomTypeName: rt.name,
@@ -328,6 +336,10 @@ export async function modifyBooking(hotel, booking, changes, actor) {
       roomsCount: next.roomsCount,
       nights: quote.nights,
       nightlyRates: quote.nightlyRates,
+      subtotalBeforeDiscount: quote.subtotalBeforeDiscount,
+      discountName: quote.discount?.name ?? null,
+      discountPercent: quote.discount?.percent ?? null,
+      discountAmount: quote.discount?.amount ?? null,
       subtotal: quote.subtotal,
       tax: quote.tax,
       total: quote.total,

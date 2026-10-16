@@ -8,10 +8,12 @@ import * as hotels from '../../modules/hotels/repository.js';
 import * as rooms from '../../modules/rooms/repository.js';
 import { forbidden, notFound } from '../../utils/errors.js';
 import { todayIn } from '../../utils/dates.js';
-import { money } from '../../utils/money.js';
+import { money, spokenMoney } from '../../utils/money.js';
 import { normalizePhone } from '../../utils/misc.js';
 import {
   availabilitySchema,
+  calculateSchema,
+  quoteSchema,
   callbackSchema,
   callerLookupSchema,
   callerSchema,
@@ -19,11 +21,15 @@ import {
   createBookingSchema,
   modifyBookingSchema,
 } from '../../validation.js';
+import { calculate } from '../../utils/calculator.js';
+import * as offersRepo from '../../modules/offers/repository.js';
 import { requireAgent, requireHotelContext } from './auth.js';
 import { agentTools } from '../../mcp/tools/guest.js';
 import {
   agentBookingView,
   availabilityForAgent,
+  combineQuotes,
+  priceStayForAgent,
   ASK_ANYTHING_ELSE,
   hotelProfileForAgent,
   paymentSentence,
@@ -64,11 +70,32 @@ router.get('/room-types', async (req, res) => {
 
 router.get('/special-rates', async (req, res) => {
   const types = await rooms.listActiveTypes(req.hotel._id);
-  res.json(specialRatesForAgent(types, todayIn(req.hotel.timezone), req.hotel.currency));
+  const today = todayIn(req.hotel.timezone);
+  res.json(specialRatesForAgent(types, today, req.hotel.currency, await offersRepo.listActive(req.hotel._id, today)));
 });
 
 router.post('/availability', validate(availabilitySchema), async (req, res) => {
   res.json(availabilityForAgent(await searchAvailability(req.hotel, req.body)));
+});
+
+router.post('/quote', validate(quoteSchema), async (req, res) => {
+  const { checkIn, checkOut, rooms: lines, ...single } = req.body;
+  const wanted = lines ?? [single];
+  const priced = [];
+  for (const line of wanted) {
+    const { roomType, ...party } = line;
+    priced.push(priceStayForAgent(await searchAvailability(req.hotel, { checkIn, checkOut, ...party }), roomType, party.roomsCount ?? 1));
+  }
+  res.json(priced.length === 1 && !lines ? priced[0] : combineQuotes(priced));
+});
+
+router.post('/calculate', validate(calculateSchema), (req, res) => {
+  try {
+    const result = calculate(req.body.expression);
+    res.json({ expression: req.body.expression, result, say: spokenMoney(req.hotel.currency, result) });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
 });
 
 router.post('/bookings', validate(createBookingSchema), async (req, res) => {

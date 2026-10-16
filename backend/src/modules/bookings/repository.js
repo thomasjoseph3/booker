@@ -44,6 +44,13 @@ export async function staysForRooms(hotelId, roomIds) {
   return { inHouse, departed };
 }
 
+/** Confirmed bookings whose stay covers `day` but who have not been checked in yet. */
+export const awaitingArrival = (hotelId, day) =>
+  Booking.find({ hotel: hotelId, status: 'confirmed', checkIn: { $lte: day }, checkOut: { $gt: day } })
+    .sort({ checkIn: 1, createdAt: 1 })
+    .select('code guestName checkIn checkOut adults children roomType roomsCount')
+    .lean();
+
 /** Per-guest booking count, completed stays, lifetime spend and last stay date. */
 export const statsByGuest = (guestIds) =>
   Booking.aggregate([

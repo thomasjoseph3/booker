@@ -1,5 +1,6 @@
 import { badRequest, notFound } from '../../utils/errors.js';
 import * as bookings from '../bookings/repository.js';
+import { todayIn } from '../../utils/dates.js';
 import * as repo from './repository.js';
 
 const MANAGER_ROLES = ['super_admin', 'hotel_admin'];
@@ -32,10 +33,27 @@ export async function listRoomsWithStays(hotel, filters) {
   for (const b of inHouse) for (const r of b.assignedRooms) current.set(String(r), b);
   const last = new Map();
   for (const b of departed) for (const r of b.assignedRooms) if (!last.has(String(r))) last.set(String(r), b);
+
+  // Guests with a confirmed booking for today who have not checked in: show their rooms as reserved.
+  // Rooms are only really assigned at check-in, so mark the lowest-numbered free rooms of the type (what check-in picks).
+  const reserved = new Map();
+  const arrivals = await bookings.awaitingArrival(hotel._id, todayIn(hotel.timezone));
+  const taken = new Set();
+  for (const b of arrivals) {
+    const free = rooms
+      .filter((r) => String(r.roomType?._id ?? r.roomType) === String(b.roomType) && ['available', 'cleaning'].includes(r.status) && !current.has(String(r._id)) && !taken.has(String(r._id)))
+      .sort((a, c) => (a.status === c.status ? 0 : a.status === 'available' ? -1 : 1));
+    for (const r of free.slice(0, b.roomsCount ?? 1)) {
+      taken.add(String(r._id));
+      reserved.set(String(r._id), stayBrief(b));
+    }
+  }
+
   return rooms.map((r) => ({
     ...r.toObject(),
     currentStay: stayBrief(current.get(String(r._id))) ?? null,
     lastStay: stayBrief(last.get(String(r._id))) ?? null,
+    reservedStay: reserved.get(String(r._id)) ?? null,
   }));
 }
 

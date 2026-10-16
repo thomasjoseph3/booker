@@ -13,6 +13,7 @@
     "mcp": "node src/mcp/main.js",
     "mcp:dev": "node --watch src/mcp/main.js",
     "mcp:token": "node scripts/mcp-token.js",
+    "eval:agent": "node --env-file=.env scripts/agent-eval.js",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.js\" \"scripts/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.js\" \"scripts/**/*.js\"",

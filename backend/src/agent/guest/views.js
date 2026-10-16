@@ -1,7 +1,8 @@
 import { config } from '../../config.js';
 import { todayIn, upcomingDays } from '../../utils/dates.js';
-import { money } from '../../utils/money.js';
+import { money, spokenMoney } from '../../utils/money.js';
 import { round2 } from '../../utils/misc.js';
+import { describeConditions } from '../../modules/offers/rules.js';
 
 // Response shapes for the agent: compact, flat and free of internal ids it does not need.
 
@@ -17,16 +18,89 @@ function specialNights(quote) {
   return [...counts].map(([label, n]) => ` ${n} of the nights are at the "${label}" rate.`).join('');
 }
 
+/** " An offer is already applied: ..." and " Offers they are close to: ..." so the agent explains the discount and can suggest meeting a condition. */
+function offerText(q) {
+  let text = '';
+  if (q.discount)
+    text += ` The "${q.discount.name}" offer is already included: ${q.discount.percent}% off the room charge, saving ${money(q.currency, q.discount.amount)} before tax (room charge ${money(q.currency, q.subtotalBeforeDiscount)} before the offer).`;
+  for (const o of q.otherOffers || []) text += ` The "${o.name}" offer (${o.percentOff}% off) applies if they ${o.needs}.`;
+  return text;
+}
+
+/** The sum behind a quote, step by step, for when the caller asks "how is that worked out?". */
+export function calculationFor(q) {
+  const groups = new Map();
+  for (const n of q.nightlyRates) groups.set(n.price, (groups.get(n.price) || 0) + 1);
+  const rooms = q.roomsCount > 1 ? ` x ${q.roomsCount} rooms` : '';
+  const steps = [`Room charge: ${[...groups].map(([price, n]) => `${n} night${n === 1 ? '' : 's'} at ${spokenMoney(q.currency, price)}`).join(' and ')}${rooms} = ${spokenMoney(q.currency, q.subtotalBeforeDiscount)}.`];
+  if (q.discount) steps.push(`Offer "${q.discount.name}": ${q.discount.percent}% off = minus ${spokenMoney(q.currency, q.discount.amount)}, so ${spokenMoney(q.currency, q.subtotal)}.`);
+  if (q.perNight && (q.nights > 1 || q.discount)) {
+    const day = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+    steps.push(
+      `Night by night, with the offer and tax already in each night (these add up to the total): ${q.perNight.map((n) => `${day(n.date)} ${spokenMoney(q.currency, n.total)}`).join(', ')}.`,
+    );
+    if (q.discount) steps.push('The offer applies to the whole stay, so a price quoted for a single night on its own does not include it and is higher.');
+  }
+  steps.push(`Tax ${q.taxPercent}% on ${spokenMoney(q.currency, q.subtotal)} = ${spokenMoney(q.currency, q.tax)}.`);
+  steps.push(`Total = ${spokenMoney(q.currency, q.subtotal)} + ${spokenMoney(q.currency, q.tax)} = ${spokenMoney(q.currency, q.total)}.`);
+  steps.push(`Advance to confirm = ${spokenMoney(q.currency, q.advanceDue)}.`);
+  return steps;
+}
+
+/** One room type's option for a specific number of rooms (the price_stay tool). */
+export function priceStayForAgent(result, roomType, requestedRooms = 1) {
+  const key = String(roomType || '').trim().toLowerCase();
+  const option = result.options.find((o) => [String(o.roomTypeId), o.code, o.name].some((v) => String(v).toLowerCase() === key))
+    ?? result.options.find((o) => o.name.toLowerCase().includes(key));
+  if (!option) return { error: `No room type matches "${roomType}". Room types: ${result.options.map((o) => o.name).join(', ')}.` };
+  const [view] = availabilityForAgent({ ...result, options: [option] }).options;
+  const needed = option.roomsNeeded ?? requestedRooms;
+  return {
+    note: 'Say these figures exactly. Do not add, multiply or round anything yourself: if the caller wants another combination, call price_stay again or use calculate.',
+    ...(needed > requestedRooms
+      ? { warning: `The caller asked for ${requestedRooms} room${requestedRooms === 1 ? '' : 's'} but this party cannot fit in fewer than ${needed} ${option.name} rooms, so the price below is for ${needed}. Say that ${requestedRooms} ${requestedRooms === 1 ? 'room is' : 'rooms are'} not enough for them and quote only this price for ${needed}. Never scale, divide or estimate a price for ${requestedRooms}.` }
+      : {}),
+    checkIn: result.checkIn,
+    checkOut: result.checkOut,
+    nights: result.nights,
+    roomsCount: option.roomsNeeded ?? undefined,
+    ...view,
+  };
+}
+
+/** Several price_stay lines (a mix of rooms) with the grand total added up here, not by the model. */
+export function combineQuotes(lines) {
+  const failed = lines.find((l) => l.error);
+  if (failed) return failed;
+  const sum = (f) => round2(lines.reduce((s, l) => s + f(l), 0));
+  const currency = lines[0].quote.currency;
+  const total = sum((l) => l.quote.total);
+  const advance = sum((l) => l.quote.advanceDue);
+  const unavailable = lines.filter((l) => !l.bookable).map((l) => l.name);
+  return {
+    note: 'Say the grand total and the advance exactly as given. Each line is a separate room type, so these are separate bookings, one per room type (a booking holds one room type).',
+    checkIn: lines[0].checkIn,
+    checkOut: lines[0].checkOut,
+    nights: lines[0].nights,
+    currency,
+    unavailable: unavailable.length ? unavailable : undefined,
+    summary: `${lines.map((l) => `${l.roomsCount ?? 1} x ${l.name}: ${money(currency, l.quote.total)}`).join(' + ')} = ${spokenMoney(currency, total)} in total including tax; advance to confirm ${spokenMoney(currency, advance)} (${lines.map((l) => money(currency, l.quote.advanceDue)).join(' + ')}).`,
+    grandTotal: total,
+    grandAdvance: advance,
+    lines,
+  };
+}
+
 export function availabilityForAgent(result) {
   const options = result.options.map((o) => {
     const q = o.quote;
     const summary = o.bookable
-      ? `${o.name}: ${money(q.currency, q.total)} in total for ${q.nights} nights including ${q.taxPercent}% tax (average ${money(q.currency, q.averageNightlyRate)} a night before tax); advance to confirm ${money(q.currency, q.advanceDue)}.${specialNights(q)}`
+      ? `${o.name}${o.roomsNeeded > 1 ? ` (${o.roomsNeeded} rooms are needed for this party)` : ''}: ${spokenMoney(q.currency, q.total)} in total for ${q.nights} nights including ${q.taxPercent}% tax${q.discount ? ' and after the offer' : ''}; advance to confirm ${spokenMoney(q.currency, q.advanceDue)}.${offerText(q)}${specialNights(q)}${q.discount ? '' : ` (average ${money(q.currency, q.averageNightlyRate)} a night before tax)`}`
       : `${o.name}: not available for this party and these dates (${o.reason}).`;
-    return { summary, ...o };
+    return { summary, ...(o.bookable ? { calculation: calculationFor(q) } : {}), ...o };
   });
   return {
-    note: "Quote each room's total and advance only from that room's own `summary` (or its own `quote`). Never reuse one room's amount for another. Different rooms have different prices.",
+    note: "Quote each room's total and advance only from that room's own `summary` (or its own `quote`). Never reuse one room's amount for another. Different rooms have different prices. A room's `calculation` lists the steps behind its price: read those steps if asked how it is worked out, and never do the sums yourself. For another number of rooms or different dates, call price_stay.",
     ...result,
     options,
   };
@@ -51,6 +125,7 @@ export function agentBookingView(b, openPayment) {
     specialRequests: b.specialRequests,
     currency: b.currency,
     subtotal: b.subtotal,
+    offerApplied: b.discountName ? `${b.discountName}: ${b.discountPercent}% off the room charge, saving ${money(b.currency, b.discountAmount)} before tax` : undefined,
     tax: b.tax,
     total: b.total,
     advanceDue: b.advanceDue,
@@ -127,8 +202,9 @@ const INTERNAL_FIELDS = ['hotel', '__v', 'createdAt', 'updatedAt'];
  * `kind` says what the rate means for the caller, so the agent never calls a peak rate an offer:
  * "offer" is below the room's regular rate, "higher" is above every regular rate, "special" is in between.
  */
-export function specialRatesForAgent(roomTypes, today, currency) {
+export function specialRatesForAgent(roomTypes, today, currency, offers = []) {
   const rates = [];
+  const typeNames = new Map(roomTypes.map((rt) => [String(rt._id), rt.name]));
   for (const rt of roomTypes) {
     const regular = [rt.basePrice, rt.weekendPrice].filter((p) => p != null);
     for (const o of rt.rateOverrides || []) {
@@ -150,7 +226,13 @@ export function specialRatesForAgent(roomTypes, today, currency) {
   return {
     currency,
     taxNote: 'Rates are per night before tax; the hotel adds its tax percent on top. check_availability gives exact totals for dates.',
-    note: 'Only describe these. If kind is "higher" it is a peak rate, not a discount. If the list is empty there are no special rates or offers right now: say so, and offer to quote regular prices.',
+    note: 'Only describe these. If kind is "higher" it is a peak rate, not a discount. "offers" are real percentage discounts that are applied automatically at check_availability and booking when the stay meets the conditions: say the percent and every condition, and never promise one the stay does not meet. If both lists are empty there are no special rates or offers right now: say so, and offer to quote regular prices.',
+    offers: offers.map((o) => ({
+      name: o.name,
+      percentOff: o.percentOff,
+      conditions: describeConditions(o, o.roomTypes.map((id) => typeNames.get(String(id))).filter(Boolean)),
+      summary: `${o.name}: ${o.percentOff}% off the room charge before tax if they ${describeConditions(o, o.roomTypes.map((id) => typeNames.get(String(id))).filter(Boolean))}.${o.description ? ` ${o.description}` : ''}`,
+    })),
     specialRates: rates.sort((a, b) => a.from.localeCompare(b.from)),
   };
 }

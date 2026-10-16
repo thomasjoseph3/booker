@@ -87,6 +87,7 @@ async function BookingContent({ params }: PageProps<"/h/[hotelId]/bookings/[code
                 {(b.nightlyRates ?? []).length <= 7 && b.nightlyRates?.map((n) => (
                   <Row key={n.date} k={day(n.date)}><span className="tabular">{money(n.price, c)}{b.roomsCount > 1 && ` × ${b.roomsCount}`}</span></Row>
                 ))}
+                {b.discountName && <Row k={`Offer: ${b.discountName} (${b.discountPercent}% off)`}><span className="tabular text-ok">−{money(b.discountAmount, c)}</span></Row>}
                 <Row k="Subtotal"><span className="tabular">{money(b.subtotal, c)}</span></Row>
                 <Row k={`Tax (${hotel.taxPercent}%)`}><span className="tabular">{money(b.tax, c)}</span></Row>
                 <Row k="Total"><span className="tabular font-semibold">{money(b.total, c)}</span></Row>

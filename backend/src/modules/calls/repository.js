@@ -66,10 +66,38 @@ export const callsForBooking = (bookingId) => CallLog.find({ bookings: bookingId
 
 // ---------- callbacks (tasks for staff) ----------
 
-export const listCallbacks = (hotelId, { status }, page) =>
-  paginate(Callback, { hotel: hotelId, ...(status ? { status: { $in: status.split(',') } } : {}) }, page, {
-    populate: ['booking', 'code status'],
-  });
+/** Urgent first, then newest first. */
+export async function listCallbacks(hotelId, { status, priority, type }, q) {
+  const filter = {
+    hotel: hotelId,
+    ...(status ? { status: { $in: status.split(',') } } : {}),
+    ...(priority ? { priority: { $in: priority.split(',') } } : {}),
+    // Tickets saved before types existed have no type: they count as plain callbacks.
+    ...(type ? { type: { $in: type.split(',').flatMap((t) => (t === 'callback' ? ['callback', null] : [t])) } } : {}),
+  };
+  const [rows, total] = await Promise.all([
+    Callback.aggregate([
+      { $match: filter },
+      { $addFields: { rank: { $switch: { branches: [{ case: { $eq: ['$priority', 'high'] }, then: 2 }, { case: { $eq: ['$priority', 'normal'] }, then: 1 }], default: 0 } } } },
+      { $sort: { rank: -1, createdAt: -1 } },
+      { $skip: (q.page - 1) * q.limit },
+      { $limit: q.limit },
+    ]),
+    Callback.countDocuments(filter),
+  ]);
+  const items = await Callback.populate(rows, { path: 'booking', select: 'code status' });
+  return { items, total, page: q.page, pages: Math.ceil(total / q.limit) };
+}
+
+export const findOpenTicket = (hotelId, callId, type) =>
+  Callback.findOne({ hotel: hotelId, callId, type, status: { $ne: 'done' } });
+
+const RANK = { low: 0, normal: 1, high: 2 };
+export function appendToTicket(ticket, reason, priority) {
+  if (!ticket.reason.includes(reason)) ticket.reason = `${ticket.reason}\n${reason}`.slice(0, 2000);
+  if (priority && RANK[priority] > RANK[ticket.priority]) ticket.priority = priority;
+  return ticket.save();
+}
 
 export const updateCallback = (hotelId, id, changes) =>
   Callback.findOneAndUpdate({ _id: id, hotel: hotelId }, { $set: changes }, { returnDocument: 'after' });

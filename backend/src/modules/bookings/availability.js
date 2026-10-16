@@ -1,5 +1,6 @@
-import { nightsBetween } from '../../utils/dates.js';
+import { nightsBetween, todayIn } from '../../utils/dates.js';
 import { availabilityFor } from '../inventory/service.js';
+import * as offersRepo from '../offers/repository.js';
 import * as rooms from '../rooms/repository.js';
 import { quoteStay } from './pricing.js';
 import { assertStayDates, roomsNeededFor } from './stayRules.js';
@@ -11,6 +12,8 @@ import { assertStayDates, roomsNeededFor } from './stayRules.js';
 export async function searchAvailability(hotel, { checkIn, checkOut, adults = 1, children = 0, roomsCount = 1 }) {
   assertStayDates(hotel, checkIn, checkOut);
   const roomTypes = await rooms.listActiveTypes(hotel._id);
+  const bookedOn = todayIn(hotel.timezone);
+  const offers = await offersRepo.listActive(hotel._id, bookedOn);
   const available = await availabilityFor(roomTypes, checkIn, checkOut);
   const options = roomTypes.map((rt) => {
     const needed = roomsNeededFor(rt, adults, children);
@@ -37,7 +40,7 @@ export async function searchAvailability(hotel, { checkIn, checkOut, adults = 1,
         : availableRooms < rooms
           ? 'Not enough rooms available for these dates'
           : undefined,
-      quote: quoteStay(hotel, rt, { checkIn, checkOut, roomsCount: rooms }),
+      quote: quoteStay(hotel, rt, { checkIn, checkOut, roomsCount: rooms }, { offers, bookedOn }),
     };
   });
   options.sort((a, b) => Number(b.bookable) - Number(a.bookable) || a.quote.total - b.quote.total);

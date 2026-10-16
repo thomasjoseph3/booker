@@ -25,6 +25,10 @@ const bookingSchema = new Schema(
     checkedOutAt: Date, // when the guest actually vacated
     nightlyRates: [{ date: String, price: Number, _id: false }],
     currency: String,
+    subtotalBeforeDiscount: Number,
+    discountName: String,
+    discountPercent: Number,
+    discountAmount: Number,
     subtotal: Number,
     tax: Number,
     total: Number,

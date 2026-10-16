@@ -171,13 +171,15 @@ export const staffToolSpecs = [
   ),
   spec(
     'list_callbacks',
-    'The queue of tasks for staff: agent hand-offs, failed refunds, undeliverable messages.',
+    'The ticket queue for staff: agent hand-offs, failed refunds, undeliverable messages.',
     z.object({
       status: z.string().optional().describe('open, in_progress or done; comma separated (default open and in_progress)'),
+      priority: z.string().optional().describe('low, normal or high; comma separated'),
+      type: z.string().optional().describe('callback, question, complaint, booking_help, group_booking, payment, special_request or system; comma separated'),
       limit,
     }),
-    async ({ hotel }, { status, limit: n }) => {
-      const r = await listCallbacks(hotel._id, { status: status || 'open,in_progress' }, page(n));
+    async ({ hotel }, { status, priority, type, limit: n }) => {
+      const r = await listCallbacks(hotel._id, { status: status || 'open,in_progress', priority, type }, page(n));
       return { total: r.total, callbacks: r.items.map(callbackBrief) };
     },
   ),

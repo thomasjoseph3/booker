@@ -29,6 +29,7 @@ export const callbackBrief = (c) => ({
   id: String(c._id),
   status: c.status,
   priority: c.priority,
+  type: c.type,
   name: c.name,
   phone: c.phone,
   reason: c.reason,

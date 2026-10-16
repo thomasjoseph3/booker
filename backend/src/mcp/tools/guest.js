@@ -31,9 +31,32 @@ export const guestToolSpecs = [
   }),
   spec(
     'list_special_rates',
-    'Date-range rates set by the hotel for coming dates: offers (cheaper than usual), festival or peak-season rates. Use it when the caller asks about offers, discounts, deals, seasonal or festival prices, or the best time to visit.',
+    'The hotel\'s offers and special rates: percentage discounts with their conditions (minimum nights, book in advance, stay dates), and date-range rates (cheaper, festival or peak). Use it when the caller asks about offers, discounts, deals, seasonal or festival prices, or the best time to visit.',
     z.object({}),
     { method: 'GET', path: '/api/agent/special-rates' },
+  ),
+  spec(
+    'price_stay',
+    'The exact price of ONE room type for a specific number of rooms and dates, with the step-by-step calculation. Use it every time the caller asks about a price you were not just given: a different number of rooms, other dates, one room instead of the total (or for a mix of rooms pass them all in "rooms" in one call and read the grand total). Never work out a price yourself.',
+    z.object({
+      checkIn: day('Check-in'),
+      checkOut: day('Check-out'),
+      roomType: z.string().optional().describe('Room type name, code or id (one room type). For a mix of rooms use "rooms" instead'),
+      adults: count().optional(),
+      children: count().optional(),
+      roomsCount: count().optional().describe('How many rooms of this type'),
+      rooms: z
+        .array(z.object({ roomType: z.string(), adults: count(), children: count().optional(), roomsCount: count().optional() }))
+        .optional()
+        .describe('A mix of rooms, e.g. one Garden Cottage and one Lake View Villa, each with the guests staying in it. The grand total is added up for you.'),
+    }),
+    { method: 'POST', path: '/api/agent/quote' },
+  ),
+  spec(
+    'calculate',
+    'A calculator. Use it for ANY arithmetic you would say aloud (adding two quotes, a difference, a split, a percentage, nights x rate). Never do sums in your head. Write the expression with numbers and + - * / ( ) %, e.g. "52416 + 26208" or "26000 - 10% * 26000".',
+    z.object({ expression: z.string().describe('Arithmetic expression, numbers only') }),
+    { method: 'POST', path: '/api/agent/calculate' },
   ),
   spec(
     'check_availability',
@@ -106,10 +129,16 @@ export const guestToolSpecs = [
   ),
   spec(
     'request_human_callback',
-    'Hand off to hotel staff: complaints, group/corporate bookings, special arrangements, or anything you cannot handle.',
+    'Raise a ticket for hotel staff to follow up. Use it when the guest asks for a person, has a complaint, a group/corporate booking, a payment problem, a special arrangement, or asks something you cannot answer from the tools. Say in "reason" what the guest needs, in one or two sentences.',
     z.object({
       name: z.string().optional(),
       phone,
+      type: z
+        .enum(['callback', 'question', 'complaint', 'booking_help', 'group_booking', 'payment', 'special_request', 'system'])
+        .optional()
+        .describe(
+          'callback = wants a person to call; question = you could not answer it; complaint; booking_help = a booking problem you could not fix; group_booking = group/corporate/event; payment = payment or refund problem; special_request = bargaining, extra arrangements',
+        ),
       reason: z.string(),
       priority: z.enum(['low', 'normal', 'high']).optional(),
       bookingCode: code.optional(),

@@ -10,3 +10,4 @@ export { Callback } from './Callback.js';
 export { Notification } from './Notification.js';
 export { AdminUser } from './AdminUser.js';
 export { AssistantChat } from './AssistantChat.js';
+export { Offer } from './Offer.js';

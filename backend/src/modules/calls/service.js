@@ -13,6 +13,7 @@ export function raiseStaffTask(hotel, booking, reason) {
     name: booking.guestName,
     phone: booking.guestPhone,
     booking: booking._id,
+    type: 'system',
     priority: 'high',
     reason,
     createdBy: 'system',
@@ -21,6 +22,9 @@ export function raiseStaffTask(hotel, booking, reason) {
 
 /** An agent asks for a human to call the guest back. */
 export async function requestCallback(hotel, { bookingCode, ...data }, actor) {
+  // One ticket per call and type: if the agent asks twice, add the new reason to the open ticket.
+  const same = data.callId ? await repo.findOpenTicket(hotel._id, data.callId, data.type) : null;
+  if (same) return repo.appendToTicket(same, data.reason, data.priority);
   const booking = bookingCode ? await bookings.findByCode(hotel._id, bookingCode) : null;
   return repo.createCallback({
     ...data,

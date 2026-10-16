@@ -69,6 +69,22 @@ export async function updateGuest(hotelId: string, guestId: string, body: { note
   return run(() => api(`/hotels/${hotelId}/guests/${guestId}`, { method: "PATCH", body }), "Guest saved");
 }
 
+// ---- offers ----
+export async function saveOffer(hotelId: string, id: string | null, body: Record<string, unknown>) {
+  return run(
+    () => (id ? api(`/hotels/${hotelId}/offers/${id}`, { method: "PATCH", body }) : api(`/hotels/${hotelId}/offers`, { method: "POST", body })),
+    "Offer saved",
+  );
+}
+export async function deleteOffer(hotelId: string, id: string) {
+  return run(() => api(`/hotels/${hotelId}/offers/${id}`, { method: "DELETE" }), "Offer deleted");
+}
+
+// ---- tickets ----
+export async function updateTicket(hotelId: string, id: string, body: { status?: string; priority?: string; assignedTo?: string; notes?: string }) {
+  return run(() => api(`/hotels/${hotelId}/callbacks/${id}`, { method: "PATCH", body }), "Ticket saved");
+}
+
 // ---- configuration ----
 export async function saveRoomType(hotelId: string, id: string | null, body: Record<string, unknown>) {
   return run(
