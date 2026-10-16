@@ -77,7 +77,7 @@ agent/
 | `tools.js` | The tool specs (zod schema + which `/api/agent` endpoint implements each). Single source of truth |
 | `toolRunner.js` | `buildGuestTools`: LangChain tools bound to one call; fills in caller phone/email; logs every call with args, result and timing |
 | `prompt.js` | Persona, speaking style and booking rules. Tune the receptionist here |
-| `routes.js`, `auth.js` | The HTTP API the agent uses as its tools (`/api/agent/*`), authenticated by API key. `GET /api/agent/tools` serves the same specs to external agent runtimes |
+| `routes.js`, `auth.js` | The HTTP API the agent uses as its tools (`/api/agent/*`), authenticated by API key. the tools themselves are written in `backend/src/mcp/tools/` and run by the MCP server (see MCP.md); `GET /api/agent/tools` lists the receptionist's tools |
 | `callRecord.js`, `session.js` | Call log (transcript, outcome, grounded summary via structured output, language, errors) and per-call state |
 | `views.js` | Agent-friendly shapes of bookings and property facts |
 

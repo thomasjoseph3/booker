@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
 import { describe, it } from 'node:test';
 import { config } from '../../src/config.js';
-import { guestToolSpecByName } from '../../src/agent/guest/tools.js';
+import { guestToolSpecByName } from '../../src/mcp/tools/guest.js';
 import { applyCallContext } from '../../src/mcp/context.js';
 import { mintCallToken, verifyCallToken } from '../../src/mcp/callToken.js';
 

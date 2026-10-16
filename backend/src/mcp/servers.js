@@ -1,13 +1,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { requestAgentApi } from '../agent/guest/http.js';
-import { guestToolSpecs } from '../agent/guest/tools.js';
-import { runStaffTool, staffToolSpecs } from '../agent/staff/tools.js';
+import { requestAgentApi } from './agentApi.js';
+import { guestToolSpecs } from './tools/guest.js';
+import { runStaffTool, staffToolSpecs } from './tools/staff.js';
 import { applyCallContext } from './context.js';
 
 /**
- * The MCP servers. This is where the hotel's tools are offered and where they are controlled: the live voice call and
- * outside MCP clients (Claude Desktop, Claude Code, other agents) reach them only through here. The tool specs stay the
- * single source of truth, so a tool added to guest/tools.js or staff/tools.js shows up here too.
+ * The MCP servers. The hotel's tools are written in tools/ and offered from here, and every caller reaches them only
+ * through here: the live voice call, the staff assistant, and outside MCP clients (Claude Desktop, Claude Code, other
+ * agents). A tool added to tools/guest.js or tools/staff.js shows up for all of them.
  *
  *   booking server  the receptionist's tools (rooms, prices, bookings). Works through the /api/agent endpoints, so the
  *                   hotel scope, validation and permissions are the API's. A live call is signed in with its call token

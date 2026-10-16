@@ -20,7 +20,7 @@ import {
   modifyBookingSchema,
 } from '../../validation.js';
 import { requireAgent, requireHotelContext } from './auth.js';
-import { agentTools } from './tools.js';
+import { agentTools } from '../../mcp/tools/guest.js';
 import {
   agentBookingView,
   availabilityForAgent,

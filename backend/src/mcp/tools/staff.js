@@ -1,4 +1,3 @@
-import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { analytics, dashboard } from '../../modules/analytics/service.js';
 import { searchAvailability } from '../../modules/bookings/availability.js';
@@ -9,15 +8,15 @@ import { inventoryGrid } from '../../modules/inventory/service.js';
 import { listPayments } from '../../modules/payments/service.js';
 import { listRoomsWithStays, listRoomTypes } from '../../modules/rooms/service.js';
 import { addDays, todayIn } from '../../utils/dates.js';
-import { hotelProfileForAgent } from '../guest/views.js';
-import { bookingBrief, callBrief, callbackBrief, guestBrief, paymentBrief, roomBrief } from './views.js';
+import { hotelProfileForAgent } from '../../agent/guest/views.js';
+import { bookingBrief, callBrief, callbackBrief, guestBrief, paymentBrief, roomBrief } from './staffViews.js';
 
 /**
  * What the staff assistant can look up. All tools are read-only and work on the signed-in user's property
  * (`ctx.hotel`), through the same services the dashboard uses. Each returns compact JSON.
  *
- * A spec is `{ name, description, schema (zod), run(ctx, args) }`. `buildStaffTools` turns the specs into LangChain
- * tools bound to one conversation; `runStaffTool` runs a spec directly (used by the tests).
+ * Defined here in the MCP code. A spec is `{ name, description, schema (zod), run(ctx, args) }`. The MCP server
+ * (mcp/servers.js) publishes them and runs them through `runStaffTool`; the staff assistant learns them from the server.
  */
 
 const MAX_ROWS = 25;
@@ -250,8 +249,6 @@ export const staffToolSpecs = [
   ),
 ];
 
-const MAX_LOGGED_RESULT = 2000;
-
 /** Runs one tool spec. Never throws: errors come back as `{ error }` so the model can explain or retry. */
 async function execute(s, ctx, args) {
   try {
@@ -259,32 +256,6 @@ async function execute(s, ctx, args) {
   } catch (e) {
     return { error: e.message, details: e.details };
   }
-}
-
-/**
- * LangChain tools bound to one conversation: they act for `ctx.hotel` and `ctx.user`, and push every call
- * (arguments, outcome, time, truncated result) onto `trace` for the conversation history.
- */
-export function buildStaffTools(ctx, trace, specs = staffToolSpecs) {
-  return specs.map((s) =>
-    tool(
-      async (args) => {
-        const started = Date.now();
-        const result = await execute(s, ctx, args);
-        const text = JSON.stringify(result);
-        trace.push({
-          name: s.name,
-          args,
-          ok: !result.error,
-          ms: Date.now() - started,
-          error: result.error,
-          result: text.slice(0, MAX_LOGGED_RESULT),
-        });
-        return text;
-      },
-      { name: s.name, description: s.description, schema: s.schema },
-    ),
-  );
 }
 
 /** Runs a tool by name with schema validation, without a model (used by the tests). */

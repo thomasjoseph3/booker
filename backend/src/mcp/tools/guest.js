@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import { toJsonSchema } from '../shared/schema.js';
+import { toJsonSchema } from '../../agent/shared/schema.js';
 
 /**
- * The receptionist's tools: everything it is allowed to do. A spec is `{ name, description, schema (zod), http }`;
- * `http` says which /api/agent endpoint implements it. The specs are the single source of truth for:
- *  - the LangChain tools the live call uses (toolRunner.js),
- *  - the public list at GET /api/agent/tools, so an external agent runtime can load the same tools,
- *  - the Gemini function declarations sent when a call starts.
+ * The receptionist's tools, defined here in the MCP code: everything it is allowed to do. A spec is
+ * `{ name, description, schema (zod), http }`; `http` says which /api/agent endpoint does the work. The MCP server
+ * (mcp/servers.js) publishes them, and the voice agent learns them from the server (tools/list), so this file is
+ * the only place a tool is written. (The public list at GET /api/agent/tools is built from it too.)
  */
 
 const phone = z
@@ -119,17 +118,6 @@ export const guestToolSpecs = [
     { method: 'POST', path: '/api/agent/callbacks' },
   ),
 ];
-
-/**
- * Call control, handled by the live call itself rather than by an HTTP endpoint (so it is not in the public tool list).
- * The model calls it after it has said goodbye; liveAgent.js then hangs up once that last turn has finished playing.
- */
-export const endCallSpec = spec(
-  'end_call',
-  'Hang up the call. Use it only when everything is done, you have asked whether there is anything else, and the caller said no or said goodbye. Say your goodbye first, then call this. Never use it while the caller still has a question or a booking is half done.',
-  z.object({}),
-  null,
-);
 
 export const guestToolSpecByName = Object.fromEntries(guestToolSpecs.map((s) => [s.name, s]));
 

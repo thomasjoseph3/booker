@@ -9,7 +9,9 @@ import { isBadKey, isRateLimit } from '../shared/model.js';
 import { geminiDeclarations } from '../shared/schema.js';
 import { buildSystemPrompt } from './prompt.js';
 import { createSession } from './session.js';
+import { endCallTool } from './callControl.js';
 import { connectCallTools } from './mcpClient.js';
+import { listMcpTools } from '../shared/mcpTools.js';
 import { buildGuestTools, invokeGuestTool } from './toolRunner.js';
 
 /**
@@ -70,16 +72,20 @@ async function handleCall(client, req) {
   await openCallLog(hotel, { callId, callerPhone, note: 'Website call', channel: 'web_live', model: config.gemini.liveModel });
 
   let mcp;
+  let mcpTools;
   try {
     mcp = await connectCallTools({ hotel, callId, callerPhone, callerEmail: session.callerEmail });
+    mcpTools = await listMcpTools(mcp);
+    if (!mcpTools.length) throw new Error('The MCP server offered no tools');
   } catch (e) {
+    await mcp?.close().catch(() => {});
     console.error('[live] MCP server unavailable:', e.message);
     await logCallError(hotel._id, callId, 'The tools server (MCP) is not reachable, so the call was not connected', { detail: e.message });
     active--;
     send(client, { type: 'error', message: 'The call could not be connected.' });
     return client.close();
   }
-  const guestTools = buildGuestTools({ session, hotel, callId }, { client: mcp });
+  const guestTools = buildGuestTools({ session, hotel, callId }, { client: mcp, mcpTools });
   const keys = keyPool.prefer(keyPool.rotated(), 'live'); // tried in turn if one is out of quota
   let upstream;
   let ready = false;
@@ -140,7 +146,7 @@ async function handleCall(client, req) {
               speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: config.gemini.liveVoice } } },
             },
             systemInstruction: { parts: [{ text: buildSystemPrompt(hotel, session) }] },
-            tools: [{ functionDeclarations: geminiDeclarations(guestTools) }],
+            tools: [{ functionDeclarations: geminiDeclarations([...mcpTools, endCallTool]) }],
             inputAudioTranscription: {},
             outputAudioTranscription: {},
           },

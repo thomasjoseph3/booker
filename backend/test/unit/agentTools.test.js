@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { agentTools, guestToolSpecs } from '../../src/agent/guest/tools.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { geminiDeclarations, toJsonSchema } from '../../src/agent/shared/schema.js';
-import { runStaffTool, staffToolSpecs } from '../../src/agent/staff/tools.js';
-import { buildGuestTools } from '../../src/agent/guest/toolRunner.js';
+import { createBookingServer, createStaffServer } from '../../src/mcp/servers.js';
+import { agentTools, guestToolSpecs } from '../../src/mcp/tools/guest.js';
+import { runStaffTool, staffToolSpecs } from '../../src/mcp/tools/staff.js';
 import { hotel } from '../fixtures/hotel.js';
+
+/** The tool list as a client sees it: connects to a real MCP server in memory and asks tools/list. */
+async function listFrom(server) {
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverSide);
+  const client = new Client({ name: 'test', version: '1' });
+  await client.connect(clientSide);
+  const { tools } = await client.listTools();
+  await client.close();
+  return tools;
+}
 
 const FORBIDDEN_KEYS = ['$schema', 'additionalProperties', 'default'];
 const keysOf = (node, found = new Set()) => {
@@ -59,9 +72,13 @@ describe('guest agent tool specs', () => {
   });
 });
 
-describe('Gemini declarations', () => {
-  const tools = buildGuestTools({ session: {}, hotel, callId: 'c1' }, { log: async () => {} });
-  const declarations = geminiDeclarations(tools);
+describe('Gemini declarations (from what the MCP server lists)', () => {
+  let declarations;
+  it('are built from tools/list', async () => {
+    const tools = await listFrom(createBookingServer({ headers: {} }));
+    assert.deepEqual(tools.map((t) => t.name).sort(), guestToolSpecs.map((t) => t.name).sort());
+    declarations = geminiDeclarations(tools);
+  });
 
   it('omits parameters for tools without arguments (Gemini rejects an empty object)', () => {
     assert.equal(declarations.find((d) => d.name === 'get_hotel_info').parameters, undefined);
@@ -95,8 +112,10 @@ describe('staff assistant tool specs', () => {
       assert.doesNotMatch(s.name, /^(create|update|delete|cancel|set|modify|refund|check_in|check_out)/, s.name);
   });
 
-  it('exposes clean schemas to the model', () => {
-    for (const d of geminiDeclarations(staffToolSpecs))
+  it('exposes clean schemas to the model, as the MCP server lists them', async () => {
+    const tools = await listFrom(createStaffServer({ hotel, user: { role: 'hotel_admin' } }));
+    assert.deepEqual(tools.map((t) => t.name).sort(), staffToolSpecs.map((t) => t.name).sort());
+    for (const d of geminiDeclarations(tools))
       for (const k of FORBIDDEN_KEYS) assert.ok(!keysOf(d.parameters ?? {}).has(k), `${d.name}: "${k}"`);
   });
 

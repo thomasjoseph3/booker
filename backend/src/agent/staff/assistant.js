@@ -3,11 +3,13 @@ import { config } from '../../config.js';
 import { getChat, getWritableChat, recordExchange, startChat } from '../../modules/conversations/service.js';
 import { createModels, toApiError } from '../shared/model.js';
 import { buildStaffPrompt } from './prompt.js';
-import { buildStaffTools } from './tools.js';
+import { listMcpTools } from '../shared/mcpTools.js';
+import { connectStaffTools } from './mcpClient.js';
+import { buildStaffTools } from './toolRunner.js';
 
 /**
- * The assistant for hotel staff, built on LangChain: a tool-calling agent (`createAgent`) with read-only tools,
- * model fallbacks and a cap on tool rounds. Every exchange, with the tool calls behind each answer, is stored in the
+ * The assistant for hotel staff, built on LangChain: a tool-calling agent (`createAgent`) whose read-only tools come
+ * from the MCP server (it signs in as the staff member), model fallbacks and a cap on tool rounds. Every exchange, with the tool calls behind each answer, is stored in the
  * conversation for history and debugging. The stored messages are the source of truth for context, so conversations
  * survive restarts and work across several server instances.
  */
@@ -49,11 +51,13 @@ export async function sendMessage(hotel, user, chatId, text, models = createMode
   const userMessage = { role: 'user', text, at: new Date() };
   const trace = [];
   const started = Date.now();
+  let mcp;
 
   try {
+    mcp = await connectStaffTools(hotel, user);
     const reply = await runAssistant({
       models,
-      tools: buildStaffTools({ hotel, user }, trace),
+      tools: buildStaffTools(mcp, await listMcpTools(mcp), trace),
       systemPrompt: buildStaffPrompt(hotel, user),
       messages: [...history.map((m) => ({ role: m.role, content: m.text })), { role: 'user', content: text }],
     });
@@ -74,5 +78,7 @@ export async function sendMessage(hotel, user, chatId, text, models = createMode
       { role: 'system', text: `Assistant error: ${error.message}`, at: new Date(), tools: trace, ms: Date.now() - started },
     ]);
     throw error;
+  } finally {
+    await mcp?.close().catch(() => {});
   }
 }

@@ -8,29 +8,29 @@ import { z } from 'zod';
 const DROP_KEYS = new Set(['$schema', 'additionalProperties', 'default']);
 const SAFE_INT = Number.MAX_SAFE_INTEGER;
 
-function clean(node) {
-  if (Array.isArray(node)) return node.map(clean);
+export function cleanSchema(node) {
+  if (Array.isArray(node)) return node.map(cleanSchema);
   if (node === null || typeof node !== 'object') return node;
   const out = {};
   for (const [key, value] of Object.entries(node)) {
     if (DROP_KEYS.has(key)) continue;
     if ((key === 'minimum' || key === 'maximum') && Math.abs(value) >= SAFE_INT) continue; // z.int() adds these bounds
-    out[key] = clean(value);
+    out[key] = cleanSchema(value);
   }
   return out;
 }
 
 /** JSON schema for a zod object schema, without the provider-hostile extras. */
-export const toJsonSchema = (schema) => clean(z.toJSONSchema(schema, { io: 'input' }));
+export const toJsonSchema = (schema) => cleanSchema(z.toJSONSchema(schema, { io: 'input' }));
 
 const hasProperties = (schema) => Object.keys(schema.properties ?? {}).length > 0;
 
 /**
- * Gemini `functionDeclarations` for LangChain tools. Gemini rejects an empty `parameters` object, so tools
- * without arguments omit it.
+ * Gemini `functionDeclarations` for tools described the MCP way: `{ name, description, inputSchema (JSON schema) }`.
+ * Gemini rejects an empty `parameters` object, so tools without arguments omit it.
  */
 export const geminiDeclarations = (tools) =>
   tools.map((t) => {
-    const parameters = toJsonSchema(t.schema);
+    const parameters = cleanSchema(t.inputSchema ?? {});
     return { name: t.name, description: t.description, ...(hasProperties(parameters) ? { parameters } : {}) };
   });

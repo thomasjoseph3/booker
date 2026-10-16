@@ -24,6 +24,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const { createMcpApp } = await import('../src/mcp/app.js');
 const mcpServer = createMcpApp({ backendUrl: base }).listen(0);
 const mcpBase = `http://127.0.0.1:${mcpServer.address().port}`;
+config.mcp.url = mcpBase; // the voice agent and the staff assistant look the MCP server up here
 let passed = 0;
 
 async function api(method, path, { body, headers = {}, expect } = {}) {
@@ -452,7 +453,7 @@ await step('agent: hotel can be addressed by slug', async () => {
 
 await step('staff assistant tools: read-only lookups, scoped to one property', async () => {
   const hotels = await import('../src/modules/hotels/repository.js');
-  const { runStaffTool } = await import('../src/agent/staff/tools.js');
+  const { runStaffTool } = await import('../src/mcp/tools/staff.js');
   const lakeside = { hotel: await hotels.findById(lakesideId), user: { name: 'Test', role: 'hotel_admin' } };
   const metro = { hotel: await hotels.findById(metroId), user: { name: 'Test', role: 'hotel_admin' } };
 
@@ -535,7 +536,16 @@ await step('staff assistant: answers via LangChain, stores the exchange with its
     ['user', 'assistant'],
   );
   assert.equal(stored.messages[1].tools.length, 1);
-  assert.match(stored.messages[1].tools[0].result, /"totalRooms":30/, 'the real tool ran against the real data');
+  assert.match(stored.messages[1].tools[0].result, /"totalRooms":30/, 'the real tool ran (through the MCP server) against the real data');
+
+  // With the MCP server down the assistant says so instead of hanging, and the failure is stored.
+  const goodUrl = config.mcp.url;
+  config.mcp.url = 'http://127.0.0.1:1';
+  await assert.rejects(
+    sendMessage(hotel, manager, chat._id, 'Anything?', { primary: fakeModel().respond(new AIMessage('x')) }),
+    (e) => e.status === 503 && /MCP/.test(e.message),
+  );
+  config.mcp.url = goodUrl;
 
   const broken = fakeModel().alwaysThrow(new Error('429 You exceeded your current quota'));
   await assert.rejects(sendMessage(hotel, manager, chat._id, 'And now?', { primary: broken }), (e) => e.status === 429);
@@ -613,7 +623,7 @@ await step('front desk: a guest still checked in after the departure date is fla
 await step('MCP: the booking server offers the receptionist tools, scoped by the hotel agent key', async () => {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-  const { guestToolSpecs } = await import('../src/agent/guest/tools.js');
+  const { guestToolSpecs } = await import('../src/mcp/tools/guest.js');
   const { data } = await api('POST', `/api/admin/hotels/${metroId}/agent-key`, { headers: admin, expect: 200 });
   const connect = async (url, headers) => {
     const client = new Client({ name: 'smoke', version: '1' });
@@ -645,7 +655,7 @@ await step('MCP: the booking server offers the receptionist tools, scoped by the
 await step('MCP: the staff server is read-only, for one property, and needs a staff login', async () => {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-  const { staffToolSpecs } = await import('../src/agent/staff/tools.js');
+  const { staffToolSpecs } = await import('../src/mcp/tools/staff.js');
   const client = new Client({ name: 'smoke', version: '1' });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${mcpBase}/mcp/staff/${lakesideId}`), { requestInit: { headers: admin } }),
@@ -683,7 +693,10 @@ await step('MCP: a live call books through its call token, and the model cannot 
     { hotel, callId, callerPhone: session.callerPhone, callerEmail: session.callerEmail },
     { url: mcpBase },
   );
-  const tools = buildGuestTools({ session, hotel, callId }, { client, log: async () => {} });
+  const { listMcpTools } = await import('../src/agent/shared/mcpTools.js');
+  const mcpTools = await listMcpTools(client);
+  assert.ok(mcpTools.some((t) => t.name === 'create_booking') && !mcpTools.some((t) => t.name === 'end_call'));
+  const tools = buildGuestTools({ session, hotel, callId }, { client, mcpTools, log: async () => {} });
   const from = addDays(todayIn(hotel.timezone), 60);
   const options = (await invokeGuestTool(tools, 'check_availability', { checkIn: from, checkOut: addDays(from, 2), adults: 2 })).options;
   assert.ok(options.length && options[0].summary.includes(options[0].name), 'availability carries its price summary');

@@ -1,18 +1,34 @@
 # MCP server
 
 The hotel's tools are offered by one **MCP server** that runs as its own process (`npm run mcp`, port 4001, this
-machine only). It is the only way the voice agent reaches the tools, and outside MCP clients (Claude Desktop, Claude
-Code, other agents) can use it too.
+machine only). It is the only way the voice agent and the staff assistant reach the tools, and outside MCP clients
+(Claude Desktop, Claude Code, other agents) can use it too.
 
 ```
 caller ── voice agent (Gemini Live) ──┐
+staff ─── admin assistant ────────────┤
                                       ├─►  MCP server :4001  ──►  hotel API :4000  ──►  database
-Claude Desktop / Claude Code / other ─┘     checks who is calling,
-                                            fills in the caller, logs every call
+Claude Desktop / Claude Code / other ─┘     the tools live here;
+                                            checks who is calling, logs every call
 ```
 
-The tools are defined once (`backend/src/agent/guest/tools.js`, `backend/src/agent/staff/tools.js`). A tool added
-there shows up in MCP too. The code is in `backend/src/mcp/`.
+## Where the tools are written
+The tools are written in the MCP code, in `backend/src/mcp/tools/`:
+
+| File | What it holds |
+|---|---|
+| `tools/guest.js` | The receptionist's tools: name, description, inputs, and which `/api/agent` endpoint does the work |
+| `tools/staff.js` | The staff assistant's read-only tools, with the code that answers them (`tools/staffViews.js` shapes the results) |
+| `servers.js` | Publishes both lists as MCP servers and runs the calls |
+
+Nobody else keeps a copy. The voice agent and the staff assistant ask the server what tools exist (`tools/list`), hand that
+list to the model, and send every tool call back to the server. To add a tool, write it in `tools/guest.js` or
+`tools/staff.js`; it then shows up for the voice agent, the staff assistant and outside clients.
+
+Only `end_call` is not an MCP tool: it hangs up the call, so the live call handles it (`agent/guest/callControl.js`).
+
+The booking rules themselves stay in the hotel API and its services. The MCP tools call them and add the checks, so a
+rule exists once and the admin screens use the same one.
 
 ## Why it is safer
 - **The voice agent holds no API key.** The MCP server holds `AGENT_MASTER_KEY`. The voice agent only has a signed
@@ -56,6 +72,6 @@ Then ask, for example, "who is arriving tomorrow?" or "what are the rates for 20
 Treat the token and the agent key like passwords. A new agent key generated in the admin replaces the old one. The
 booking tools change real data, so give that key only to clients you trust.
 
-## Not on MCP yet
-The staff assistant inside the admin still calls its read-only tools in-process (it is already signed in as the staff
-member). Its tools are also on the staff MCP endpoint for outside clients.
+## The staff assistant
+Inside the admin, the assistant signs in to the staff server as the logged-in staff member, with a login token made for
+that one question that lasts five minutes. If the MCP server is down it says the tools server is not reachable.

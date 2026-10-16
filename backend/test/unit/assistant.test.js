@@ -4,7 +4,8 @@ import { AIMessage, fakeModel } from 'langchain';
 import { z } from 'zod';
 import { runAssistant } from '../../src/agent/staff/assistant.js';
 import { toApiError } from '../../src/agent/shared/model.js';
-import { buildStaffTools } from '../../src/agent/staff/tools.js';
+import { toJsonSchema } from '../../src/agent/shared/schema.js';
+import { buildStaffTools } from '../../src/agent/staff/toolRunner.js';
 import { ApiError, badRequest } from '../../src/utils/errors.js';
 import { hotel } from '../fixtures/hotel.js';
 
@@ -12,11 +13,28 @@ const ctx = { hotel, user: { name: 'Anu', role: 'hotel_admin' } };
 const spec = (name, run, schema = z.object({})) => ({ name, description: `Test tool ${name} used for checking behaviour`, schema, run });
 const ask = (text) => [{ role: 'user', content: text }];
 
+// The assistant's tools run on the MCP server. A fake client stands in for it: it lists the specs the way the server
+// would and runs them for the test hotel and user. (The real server is covered in mcp.test.js and the smoke test.)
+function staffTools(trace, specs) {
+  const mcpTools = specs.map((s) => ({ name: s.name, description: s.description, inputSchema: toJsonSchema(s.schema) }));
+  const client = {
+    callTool: async ({ name, arguments: args }) => {
+      const found = specs.find((s) => s.name === name);
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(await found.run(ctx, args)) }] };
+      } catch (e) {
+        return { isError: true, content: [{ type: 'text', text: JSON.stringify({ error: e.message, details: e.details }) }] };
+      }
+    },
+  };
+  return buildStaffTools(client, mcpTools, trace);
+}
+
 // A scripted model stands in for Gemini, so the whole agent loop is tested without a network.
 describe('staff assistant loop (LangChain agent)', () => {
   it('lets the model call a tool, then answers from the result, and traces the call', async () => {
     const trace = [];
-    const tools = buildStaffTools(ctx, trace, [spec('get_overview', async () => ({ arrivals: 0 }))]);
+    const tools = staffTools(trace, [spec('get_overview', async () => ({ arrivals: 0 }))]);
     const model = fakeModel()
       .respondWithTools([{ name: 'get_overview', args: {} }])
       .respond(new AIMessage('A quiet day: no arrivals.'));
@@ -34,22 +52,22 @@ describe('staff assistant loop (LangChain agent)', () => {
     assert.ok(trace[0].ms >= 0);
   });
 
-  it('passes the model its arguments, validated against the tool schema', async () => {
+  it('hands the tool exactly the arguments the model gave (the MCP server checks them)', async () => {
     const trace = [];
     const seen = [];
-    const tools = buildStaffTools(ctx, trace, [
+    const tools = staffTools(trace, [
       spec('get_analytics', async (_ctx, args) => (seen.push(args), { ok: 1 }), z.object({ days: z.coerce.number().int().optional() })),
     ]);
     const model = fakeModel()
-      .respondWithTools([{ name: 'get_analytics', args: { days: '7' } }])
+      .respondWithTools([{ name: 'get_analytics', args: { days: 7 } }])
       .respond(new AIMessage('done'));
     await runAssistant({ models: { primary: model }, tools, systemPrompt: 's', messages: ask('week?') });
-    assert.deepEqual(seen, [{ days: 7 }], 'string "7" is coerced to the number 7');
+    assert.deepEqual(seen, [{ days: 7 }]);
   });
 
   it('keeps going when a tool fails: the error is traced and given to the model', async () => {
     const trace = [];
-    const tools = buildStaffTools(ctx, trace, [
+    const tools = staffTools(trace, [
       spec('get_booking', async () => {
         throw badRequest('Booking not found');
       }),
@@ -78,7 +96,7 @@ describe('staff assistant loop (LangChain agent)', () => {
   });
 
   it('stops a model that keeps calling tools forever, with a message a person can read', async () => {
-    const tools = buildStaffTools(ctx, [], [spec('get_overview', async () => ({}))]);
+    const tools = staffTools([], [spec('get_overview', async () => ({}))]);
     const loop = fakeModel();
     for (let i = 0; i < 12; i++) loop.respondWithTools([{ name: 'get_overview', args: {}, id: `call-${i}` }]);
     const answer = await runAssistant({ models: { primary: loop }, tools, systemPrompt: 's', messages: ask('loop') });

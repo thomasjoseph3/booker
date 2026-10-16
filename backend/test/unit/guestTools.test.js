@@ -13,6 +13,10 @@ describe('guest tools (LangChain) used by the live call', () => {
   let session;
   let tools;
 
+  // What the MCP server would list (names and inputs only matter here; the real list is tested in agentTools.test.js).
+  const mcpTools = ['check_availability', 'find_bookings', 'create_booking', 'cancel_booking', 'list_room_types', 'get_hotel_info'].map(
+    (name) => ({ name, description: `The ${name} tool`, inputSchema: { type: 'object', properties: {} } }),
+  );
   const fakeClient = {
     callTool: async (request) => {
       calls.push(request);
@@ -29,7 +33,7 @@ describe('guest tools (LangChain) used by the live call', () => {
     session = createSession({ callerPhone: '+919847012345', callerEmail: 'asha@example.com' });
     tools = buildGuestTools(
       { session, hotel, callId: 'web-1' },
-      { client: fakeClient, log: async (hotelId, callId, entries) => logged.push({ hotelId, callId, entries }) },
+      { client: fakeClient, mcpTools, log: async (hotelId, callId, entries) => logged.push({ hotelId, callId, entries }) },
     );
   });
 
@@ -100,9 +104,12 @@ describe('guest tools (LangChain) used by the live call', () => {
     assert.match((await invokeGuestTool(tools, 'get_hotel_info', {})).error, /ECONNREFUSED/);
   });
 
-  it('rejects unknown tools and invalid arguments without calling the MCP server', async () => {
+  it("offers the model the MCP server's tools plus end_call, and nothing else", () => {
+    assert.deepEqual(tools.map((t) => t.name).sort(), [...mcpTools.map((t) => t.name), 'end_call'].sort());
+  });
+
+  it('rejects tools the server did not list without calling it', async () => {
     assert.match((await invokeGuestTool(tools, 'delete_everything', {})).error, /Unknown tool/);
-    assert.ok((await invokeGuestTool(tools, 'check_availability', { checkIn: '2026-12-10' })).error, 'missing checkOut and adults');
     assert.equal(calls.length, 0);
   });
 });

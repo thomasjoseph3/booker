@@ -1,4 +1,4 @@
-import { config } from '../../config.js';
+import { config } from '../config.js';
 
 /**
  * Calls one /api/agent endpoint for a tool spec: `{id}` in the path comes from the input, GET inputs go in the query

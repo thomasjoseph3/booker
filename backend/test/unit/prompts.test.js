@@ -4,7 +4,7 @@ import { config } from '../../src/config.js';
 import { buildSystemPrompt } from '../../src/agent/guest/prompt.js';
 import { agentBookingView, hotelProfileForAgent, paymentSentence, roomTypeForAgent } from '../../src/agent/guest/views.js';
 import { buildStaffPrompt } from '../../src/agent/staff/prompt.js';
-import { bookingBrief, callBrief, paymentBrief, roomBrief } from '../../src/agent/staff/views.js';
+import { bookingBrief, callBrief, paymentBrief, roomBrief } from '../../src/mcp/tools/staffViews.js';
 import { todayIn } from '../../src/utils/dates.js';
 import { booking, hotel } from '../fixtures/hotel.js';
 

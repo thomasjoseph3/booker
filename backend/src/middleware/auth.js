@@ -5,8 +5,8 @@ import * as users from '../modules/auth/repository.js';
 import * as hotels from '../modules/hotels/repository.js';
 import { forbidden, notFound, unauthorized } from '../utils/errors.js';
 
-export function signToken(user) {
-  return jwt.sign({ sub: String(user._id), role: user.role }, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+export function signToken(user, expiresIn = config.jwtExpiresIn) {
+  return jwt.sign({ sub: String(user._id), role: user.role }, config.jwtSecret, { expiresIn });
 }
 
 export async function requireAdmin(req, res, next) {

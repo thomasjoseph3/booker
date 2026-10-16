@@ -23,7 +23,7 @@ existed and is reused unchanged.
 | Browser to backend transport | **WebSocket** with raw PCM audio | Simple, no extra service or account. Uncompressed audio avoids encode and decode delay. |
 | Microphone capture | **Web Audio API + AudioWorklet** | Runs on its own audio thread, so capture does not glitch when the page is busy. |
 | Server WebSocket | **`ws`** npm package | Standard Node WebSocket server and client. |
-| Tool calling | Gemini function calling, tool schemas in `backend/src/agent/tools.js` | The model decides when to check availability or book; the backend executes it against the real API. |
+| Tool calling | Gemini function calling, tools written in `backend/src/mcp/tools/guest.js` and run by the MCP server | The model decides when to check availability or book; the backend executes it against the real API. |
 | Guest messages | **Nodemailer over SMTP** (Gmail app password for now) | WhatsApp setup was pending; email works immediately. `GUEST_CHANNELS` selects email, WhatsApp or both. |
 | Tools, staff assistant, summaries | **LangChain** (`langchain`, `@langchain/core`, `@langchain/google-genai`) | One zod schema per tool; the staff assistant is a `createAgent` agent; summaries use structured output. The live audio path stays native (see ARCHITECTURE.md, "Where LangChain stops"). |
 
@@ -52,7 +52,7 @@ speaker <- scheduled PCM16 24 kHz   <-WS--  (relay + tools + logging) <-- audio,
    - `model`: `GEMINI_LIVE_MODEL`
    - `responseModalities: ['AUDIO']` and the prebuilt voice (`GEMINI_LIVE_VOICE`)
    - `systemInstruction`: built by `buildSystemPrompt()` in `agent/prompt.js` (hotel facts, speaking style, booking rules)
-   - `tools`: function declarations generated from `agent/tools.js`
+   - `tools`: function declarations built from the tool list the MCP server offers
    - `inputAudioTranscription` / `outputAudioTranscription`: text of both sides, used for captions and logs
 6. **Greeting.** On `setupComplete` the backend sends a text turn telling the model to say the hotel's greeting.
 7. **Audio relay.** Browser chunks are wrapped as `realtimeInput.audio` (base64, `audio/pcm;rate=16000`) and sent
@@ -93,7 +93,7 @@ Binary frames are audio. Text frames are JSON events.
 |---|---|
 | `backend/src/agent/liveAgent.js` | WebSocket server, Gemini Live relay, tool execution, transcript logging |
 | `backend/src/agent/prompt.js` | System prompt: persona, speaking style, booking rules, property facts |
-| `backend/src/agent/tools.js` | Tool definitions (name, description, JSON schema, which HTTP endpoint implements it) |
+| `backend/src/mcp/tools/guest.js` | Tool definitions (name, description, JSON schema, which HTTP endpoint implements it) |
 | `backend/src/agent/toolRunner.js` | LangChain tools for one call: each runs the agent API request and logs it |
 | `backend/src/agent/routes.js` | The booking API the agent uses as tools (`/api/agent/*`) |
 | `backend/src/agent/callRecord.js` | Call log: open, append transcript, close with outcome and summary |
