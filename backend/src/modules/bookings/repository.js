@@ -60,7 +60,7 @@ export const statsByGuest = (guestIds) =>
   ]);
 
 /**
- * Admin booking list. `status` is comma separated; `view` (arrivals, departures, in_house) narrows by date on top of
+ * Admin booking list. Newest booking first. `status` is comma separated; `view` (arrivals, departures, in_house) narrows by date on top of
  * any explicit status filter; `from`/`to` select stays overlapping that range.
  */
 export function search(hotel, q) {
@@ -75,6 +75,7 @@ export function search(hotel, q) {
       arrivals: [{ checkIn: date }, ['pending_payment', 'confirmed', 'checked_in']],
       departures: [{ checkOut: date }, ['checked_in', 'checked_out']],
       in_house: [{}, ['checked_in']],
+      overdue: [{ checkOut: { $lt: date } }, ['checked_in']], // still checked in after the departure date
     };
     const [dates, statuses] = views[q.view];
     Object.assign(filter, dates);
@@ -84,7 +85,7 @@ export function search(hotel, q) {
     const rx = new RegExp(escapeRegex(q.q), 'i');
     filter.$or = [{ code: rx }, { guestName: rx }, { guestPhone: rx }, { guestEmail: rx }];
   }
-  return paginate(Booking, filter, q, { sort: { checkIn: -1, createdAt: -1 }, select: '-history -nightlyRates' });
+  return paginate(Booking, filter, q, { sort: { createdAt: -1, _id: -1 }, select: '-history -nightlyRates' });
 }
 
 // ---------- writes ----------

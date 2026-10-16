@@ -73,7 +73,8 @@ const property = {
   agent: {
     greeting: 'Namaskaram, thank you for calling Lakeside Palms Resort, Kumarakom. How may I help you today?',
     language: 'en-IN',
-    instructions: 'Mention the complimentary breakfast and sunset houseboat cruise when relevant.',
+    instructions:
+      'Mention the complimentary breakfast when relevant. The sunset houseboat cruise is paid (INR 2,000 per person), so never call it free.',
   },
 };
 

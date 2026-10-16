@@ -48,6 +48,7 @@ export const config = {
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   },
   holdSweepSeconds: Number(process.env.HOLD_SWEEP_SECONDS || 60),
+  cleaningMaxHours: Number(process.env.CLEANING_MAX_HOURS || 24), // a room left on "cleaning" longer than this goes back to available
   // Guest phone numbers without a "+" prefix are assumed to be in this country
   defaultCountryCode: process.env.DEFAULT_COUNTRY_CODE || '91',
   // Which channels guest messages go out on: comma list of whatsapp,email

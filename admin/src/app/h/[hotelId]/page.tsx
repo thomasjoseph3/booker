@@ -15,7 +15,7 @@ type Dashboard = {
   occupancyTonight: { booked: number; totalRooms: number; percent: number };
   occupancy: { date: string; booked: number; totalRooms: number; percent: number }[];
   arrivals: Booking[]; departures: Booking[];
-  counts: { inHouse: number; pendingPayment: number; callsToday: number; bookingsToday: number };
+  counts: { inHouse: number; overdueCheckouts: number; pendingPayment: number; callsToday: number; bookingsToday: number };
   revenue30d: { collected: number; refunded: number; net: number };
   roomStatus: { available: number; occupied: number; cleaning: number; out_of_service: number };
 };
@@ -54,6 +54,12 @@ async function DashboardContent({ params }: { params: PageProps<"/h/[hotelId]">[
         <Stat label="Agent calls" value={d.counts.callsToday} hint="last 24 hours" href={`${base}/calls`} />
         <Stat label="Net collected" value={compactMoney(d.revenue30d.net, c)} hint="last 30 days" href={`${base}/payments`} />
       </div>
+
+      {d.counts.overdueCheckouts > 0 && (
+        <Link href={`${base}/bookings?view=overdue`} className="mb-4 block rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm">
+          {d.counts.overdueCheckouts} guest{d.counts.overdueCheckouts === 1 ? " is" : "s are"} still checked in after their departure date. Check them out or extend the stay →
+        </Link>
+      )}
 
       <Card title="Rooms right now" className="mb-4" actions={<Link href={`${base}/rooms`} className="text-xs text-accent">Housekeeping board →</Link>}>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

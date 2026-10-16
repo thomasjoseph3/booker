@@ -26,6 +26,7 @@ export async function dashboard(hotel) {
     inv,
     bySource,
     roomStatus,
+    overdueCheckouts,
   } = data;
 
   const totalRooms = roomTypes.reduce((s, rt) => s + rt.totalRooms, 0);
@@ -47,7 +48,7 @@ export async function dashboard(hotel) {
     occupancy,
     arrivals,
     departures,
-    counts: { inHouse, pendingPayment, openCallbacks, callsToday, bookingsToday },
+    counts: { inHouse, overdueCheckouts, pendingPayment, openCallbacks, callsToday, bookingsToday },
     revenue30d: { collected: round2(collected), refunded: round2(refunded), net: round2(collected - refunded) },
     bookingsBySource30d: Object.fromEntries(bySource.map((s) => [s._id, s.count])),
     // physical rooms right now (housekeeping view); `occupancyTonight` is what is sold

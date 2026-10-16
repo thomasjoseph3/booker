@@ -7,6 +7,7 @@ import * as calls from '../../modules/calls/service.js';
 import * as hotels from '../../modules/hotels/repository.js';
 import * as rooms from '../../modules/rooms/repository.js';
 import { forbidden, notFound } from '../../utils/errors.js';
+import { todayIn } from '../../utils/dates.js';
 import { money } from '../../utils/money.js';
 import { normalizePhone } from '../../utils/misc.js';
 import {
@@ -20,7 +21,15 @@ import {
 } from '../../validation.js';
 import { requireAgent, requireHotelContext } from './auth.js';
 import { agentTools } from './tools.js';
-import { agentBookingView, ASK_ANYTHING_ELSE, hotelProfileForAgent, paymentSentence, roomTypeForAgent } from './views.js';
+import {
+  agentBookingView,
+  availabilityForAgent,
+  ASK_ANYTHING_ELSE,
+  hotelProfileForAgent,
+  paymentSentence,
+  roomTypeForAgent,
+  specialRatesForAgent,
+} from './views.js';
 
 /** The HTTP API the agent calls as its tools. Mounted at /api/agent. */
 const router = Router();
@@ -53,8 +62,13 @@ router.get('/room-types', async (req, res) => {
   res.json({ currency: req.hotel.currency, taxPercent: req.hotel.taxPercent, roomTypes: types.map(roomTypeForAgent) });
 });
 
+router.get('/special-rates', async (req, res) => {
+  const types = await rooms.listActiveTypes(req.hotel._id);
+  res.json(specialRatesForAgent(types, todayIn(req.hotel.timezone), req.hotel.currency));
+});
+
 router.post('/availability', validate(availabilitySchema), async (req, res) => {
-  res.json(await searchAvailability(req.hotel, req.body));
+  res.json(availabilityForAgent(await searchAvailability(req.hotel, req.body)));
 });
 
 router.post('/bookings', validate(createBookingSchema), async (req, res) => {

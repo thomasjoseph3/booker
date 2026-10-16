@@ -82,3 +82,7 @@ export async function deactivateRoomType(hotel, id) {
 
 export const listRoomTypes = (hotel) => repo.listTypes(hotel._id);
 export const createRoomType = (hotel, data) => repo.createType(hotel._id, data);
+
+/** Housekeeping takes a day at most: rooms left on "cleaning" longer than that are ready again. Returns how many. */
+export const releaseStaleCleaning = (maxHours, now = new Date()) =>
+  repo.releaseStaleCleaning(new Date(now.getTime() - maxHours * 3600 * 1000));

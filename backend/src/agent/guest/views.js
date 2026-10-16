@@ -5,6 +5,33 @@ import { round2 } from '../../utils/misc.js';
 
 // Response shapes for the agent: compact, flat and free of internal ids it does not need.
 
+/**
+ * Availability with one plain sentence per room type. The voice model once read the Garden Cottage's total off the
+ * wrong entry of the nested quotes and quoted it for the Lake View Villa, so each room's price is spelled out next to
+ * its name and the note says to quote from that sentence only.
+ */
+/** " N nights are at the X rate." when date-range rates apply to part of the stay, so the agent can explain the price. */
+function specialNights(quote) {
+  const counts = new Map();
+  for (const n of quote.nightlyRates) if (n.label) counts.set(n.label, (counts.get(n.label) || 0) + 1);
+  return [...counts].map(([label, n]) => ` ${n} of the nights are at the "${label}" rate.`).join('');
+}
+
+export function availabilityForAgent(result) {
+  const options = result.options.map((o) => {
+    const q = o.quote;
+    const summary = o.bookable
+      ? `${o.name}: ${money(q.currency, q.total)} in total for ${q.nights} nights including ${q.taxPercent}% tax (average ${money(q.currency, q.averageNightlyRate)} a night before tax); advance to confirm ${money(q.currency, q.advanceDue)}.${specialNights(q)}`
+      : `${o.name}: not available for this party and these dates (${o.reason}).`;
+    return { summary, ...o };
+  });
+  return {
+    note: "Quote each room's total and advance only from that room's own `summary` (or its own `quote`). Never reuse one room's amount for another. Different rooms have different prices.",
+    ...result,
+    options,
+  };
+}
+
 /** A booking as the agent sees it (optionally with the open payment link). */
 export function agentBookingView(b, openPayment) {
   return {
@@ -95,5 +122,38 @@ export function paymentSentence(hotel, booking, payment) {
 const INTERNAL_FIELDS = ['hotel', '__v', 'createdAt', 'updatedAt'];
 
 /** A room type without bookkeeping fields. */
+/**
+ * The date-range rates admins set on room types (Room types & pricing in the admin), for the dates still ahead.
+ * `kind` says what the rate means for the caller, so the agent never calls a peak rate an offer:
+ * "offer" is below the room's regular rate, "higher" is above every regular rate, "special" is in between.
+ */
+export function specialRatesForAgent(roomTypes, today, currency) {
+  const rates = [];
+  for (const rt of roomTypes) {
+    const regular = [rt.basePrice, rt.weekendPrice].filter((p) => p != null);
+    for (const o of rt.rateOverrides || []) {
+      if (o.to < today) continue;
+      const kind = o.price < Math.min(...regular) ? 'offer' : o.price > Math.max(...regular) ? 'higher' : 'special';
+      rates.push({
+        roomType: rt.name,
+        roomTypeId: String(rt._id),
+        name: o.label || 'Special rate',
+        from: o.from > today ? o.from : today,
+        to: o.to,
+        pricePerNightBeforeTax: o.price,
+        regularPricePerNightBeforeTax: rt.basePrice,
+        kind,
+        summary: `${rt.name}, ${o.label || 'special rate'}, ${o.from} to ${o.to}: ${money(currency, o.price)} a night before tax (${kind === 'offer' ? 'below' : kind === 'higher' ? 'above' : 'near'} the regular ${money(currency, rt.basePrice)}).`,
+      });
+    }
+  }
+  return {
+    currency,
+    taxNote: 'Rates are per night before tax; the hotel adds its tax percent on top. check_availability gives exact totals for dates.',
+    note: 'Only describe these. If kind is "higher" it is a peak rate, not a discount. If the list is empty there are no special rates or offers right now: say so, and offer to quote regular prices.',
+    specialRates: rates.sort((a, b) => a.from.localeCompare(b.from)),
+  };
+}
+
 export const roomTypeForAgent = (roomType) =>
   Object.fromEntries(Object.entries(roomType).filter(([key]) => !INTERNAL_FIELDS.includes(key)));

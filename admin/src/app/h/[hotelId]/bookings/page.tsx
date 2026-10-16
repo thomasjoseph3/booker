@@ -8,7 +8,7 @@ import { buttonClass, Card, inputClass, PageHeader, PageSkeleton, Pagination } f
 export const metadata = { title: "Bookings" };
 
 const STATUSES = [["", "Any status"], ["pending_payment", "Awaiting payment"], ["confirmed", "Confirmed"], ["checked_in", "Checked in"], ["checked_out", "Checked out"], ["cancelled", "Cancelled"], ["expired", "Expired (unpaid)"], ["no_show", "No-show"]];
-const VIEWS = [["", "All dates"], ["arrivals", "Arriving today"], ["departures", "Departing today"], ["in_house", "In house now"]];
+const VIEWS = [["", "All dates"], ["arrivals", "Arriving today"], ["departures", "Departing today"], ["in_house", "In house now"], ["overdue", "Overdue check-out"]];
 const SOURCES = [["", "Any source"], ["phone_agent", "Phone agent"], ["website", "Website"], ["ota", "OTA"], ["admin", "Staff"], ["walk_in", "Walk-in"]];
 
 export default function BookingsPage(props: PageProps<"/h/[hotelId]/bookings">) {

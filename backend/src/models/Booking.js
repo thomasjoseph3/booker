@@ -53,6 +53,7 @@ const bookingSchema = new Schema(
 );
 
 bookingSchema.index({ hotel: 1, checkIn: 1 });
+bookingSchema.index({ hotel: 1, createdAt: -1 });
 bookingSchema.index({ hotel: 1, status: 1 });
 bookingSchema.index({ hotel: 1, guestPhone: 1 });
 bookingSchema.index({ status: 1, holdExpiresAt: 1 });

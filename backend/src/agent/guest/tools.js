@@ -31,6 +31,12 @@ export const guestToolSpecs = [
     path: '/api/agent/room-types',
   }),
   spec(
+    'list_special_rates',
+    'Date-range rates set by the hotel for coming dates: offers (cheaper than usual), festival or peak-season rates. Use it when the caller asks about offers, discounts, deals, seasonal or festival prices, or the best time to visit.',
+    z.object({}),
+    { method: 'GET', path: '/api/agent/special-rates' },
+  ),
+  spec(
     'check_availability',
     'Check which room types are available for given dates and party size, with prices including tax and the advance required.',
     z.object({

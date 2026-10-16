@@ -1,6 +1,7 @@
 import { config } from './config.js';
 import { expireHolds } from './modules/bookings/service.js';
 import { closeStaleCalls } from './modules/calls/service.js';
+import { releaseStaleCleaning } from './modules/rooms/service.js';
 
 // Single-instance sweeper. With several API instances, run this in one worker (or use a scheduler).
 export function startJobs() {
@@ -11,6 +12,8 @@ export function startJobs() {
     try {
       const n = await expireHolds();
       if (n) console.log(`[jobs] expired ${n} unpaid booking hold(s)`);
+      const clean = await releaseStaleCleaning(config.cleaningMaxHours);
+      if (clean) console.log(`[jobs] ${clean} room(s) were on cleaning for over ${config.cleaningMaxHours}h, now available`);
       const stale = await closeStaleCalls(config.gemini.maxLiveMinutes + 5);
       if (stale) console.log(`[jobs] closed ${stale} call(s) left open`);
     } catch (e) {

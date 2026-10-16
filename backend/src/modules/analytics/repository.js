@@ -17,6 +17,7 @@ export async function dashboardQueries({ hotelId: h, today, since, startOfToday,
     inv,
     bySource,
     roomStatus,
+    overdueCheckouts,
   ] = await Promise.all([
     RoomType.find({ hotel: h, active: true }).lean(),
     Booking.find({ hotel: h, checkIn: today, status: { $in: ['confirmed', 'pending_payment', 'checked_in'] } }).sort({ guestName: 1 }),
@@ -33,6 +34,7 @@ export async function dashboardQueries({ hotelId: h, today, since, startOfToday,
     Inventory.aggregate([{ $match: { hotel: h, date: { $in: horizon } } }, { $group: { _id: '$date', booked: { $sum: '$booked' } } }]),
     Booking.aggregate([{ $match: { hotel: h, createdAt: { $gte: since } } }, { $group: { _id: '$source', count: { $sum: 1 } } }]),
     Room.aggregate([{ $match: { hotel: h } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Booking.countDocuments({ hotel: h, status: 'checked_in', checkOut: { $lt: today } }),
   ]);
   return {
     roomTypes,
@@ -47,6 +49,7 @@ export async function dashboardQueries({ hotelId: h, today, since, startOfToday,
     inv,
     bySource,
     roomStatus,
+    overdueCheckouts,
   };
 }
 

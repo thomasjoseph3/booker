@@ -107,12 +107,31 @@ describe('staff assistant data shapes', () => {
   });
 });
 
+describe('hold line while a tool runs', () => {
+  it('asks the caller to wait in their own language, with Malayalam and Hindi examples', () => {
+    const p = buildSystemPrompt(hotel, {});
+    assert.match(p, /never in English when they are speaking Malayalam or Hindi/);
+    assert.match(p, /ഒരു നിമിഷം കാത്തിരിക്കൂ/);
+    assert.match(p, /कृपया एक पल रुकिए/);
+    assert.match(p, /Please hold on a moment while I book this/);
+  });
+});
+
 describe('language matching', () => {
   it('tells the receptionist to follow the caller between Malayalam, English and a mix', () => {
     const p = buildSystemPrompt(hotel, {});
     assert.match(p, /Malayalam in, Malayalam out/);
-    assert.match(p, /switch language during the call, switch with them/);
+    assert.match(p, /switch language during the call.*switch with them/);
     assert.match(p, /Do not ask which language/);
+  });
+
+  it('limits the receptionist to Malayalam, Hindi and English and treats odd words as mishearings', () => {
+    const p = buildSystemPrompt(hotel, {});
+    assert.match(p, /exactly three languages: Malayalam, Hindi and English/);
+    assert.match(p, /Never speak Spanish, German, French, Tamil, or any other language/);
+    assert.match(p, /almost always a mishearing of Malayalam, Hindi or English/);
+    assert.match(p, /Hindi in, Hindi out/);
+    assert.match(p, /I can help you in Malayalam, Hindi or English/);
     assert.match(p, /booking codes and email addresses letter by letter/);
   });
 

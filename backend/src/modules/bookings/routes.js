@@ -11,7 +11,7 @@ const bookingListQuery = pageQuery.extend({
   status: z.string().optional(), // comma separated
   from: day.optional(), // stays overlapping [from, to]
   to: day.optional(),
-  view: z.enum(['arrivals', 'departures', 'in_house']).optional(),
+  view: z.enum(['arrivals', 'departures', 'in_house', 'overdue']).optional(),
   date: day.optional(),
   q: z.string().max(100).optional(),
   source: z.string().optional(),

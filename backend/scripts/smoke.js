@@ -577,6 +577,35 @@ await step('webhook: bad gateway signature is rejected', async () => {
   assert.equal(r.status, 400);
 });
 
+await step('housekeeping: a room stuck on "cleaning" for over a day is ready again', async () => {
+  const { Room } = await import('../src/models/index.js');
+  const { releaseStaleCleaning } = await import('../src/modules/rooms/service.js');
+  const room = await Room.findOne({ status: 'cleaning' });
+  assert.ok(room, 'the walk-in test left a room on cleaning');
+  assert.equal(await releaseStaleCleaning(24), 0, 'a room that just went to cleaning stays there');
+  await Room.collection.updateOne({ _id: room._id }, { $set: { updatedAt: new Date(Date.now() - 25 * 3600 * 1000) } });
+  assert.equal(await releaseStaleCleaning(24), 1);
+  assert.equal((await Room.findById(room._id)).status, 'available');
+});
+
+await step('front desk: a guest still checked in after the departure date is flagged as overdue', async () => {
+  const { Booking } = await import('../src/models/index.js');
+  const b = await Booking.findOne({ status: 'checked_out' });
+  const original = { status: b.status, checkOut: b.checkOut };
+  const today = todayIn('Asia/Kolkata');
+  const dash = async () => (await api('GET', `/api/admin/hotels/${lakesideId}/dashboard`, { headers: admin, expect: 200 })).data;
+  assert.equal((await dash()).counts.overdueCheckouts, 0);
+  await Booking.collection.updateOne({ _id: b._id }, { $set: { status: 'checked_in', checkOut: addDays(today, -2) } });
+  assert.equal((await dash()).counts.overdueCheckouts, 1);
+  const list = (await api('GET', `/api/admin/hotels/${lakesideId}/bookings?view=overdue`, { headers: admin, expect: 200 })).data.items;
+  assert.deepEqual(
+    list.map((x) => x.code),
+    [b.code],
+  );
+  await Booking.collection.updateOne({ _id: b._id }, { $set: original });
+  assert.equal((await dash()).counts.overdueCheckouts, 0);
+});
+
 await step('invariant: inventory counters equal the nights every booking holds', async () => {
   const { Booking, Inventory } = await import('../src/models/index.js');
   const { heldNights } = await import('./ledger.js');

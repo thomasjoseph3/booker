@@ -56,3 +56,7 @@ export async function occupyIfAvailable(hotelId, typeId, roomId) {
 }
 
 export const setStatus = (roomIds, status) => Room.updateMany({ _id: { $in: roomIds } }, { $set: { status } });
+
+/** Rooms on "cleaning" since before `before` go back to available. Returns how many. */
+export const releaseStaleCleaning = async (before) =>
+  (await Room.updateMany({ status: 'cleaning', updatedAt: { $lt: before } }, { $set: { status: 'available' } })).modifiedCount;
